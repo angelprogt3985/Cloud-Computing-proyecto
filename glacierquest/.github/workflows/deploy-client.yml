@@ -1,0 +1,3 @@
+# Workflow de CI/CD: build del cliente y sincronizacion
+# de client/build/ al bucket de Cloud Storage.
+# (pasos por definir)
