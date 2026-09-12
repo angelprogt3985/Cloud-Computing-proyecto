@@ -1,3 +1,7 @@
-# Dockerfile para empaquetar la API de Node/Express
-# y desplegarla como contenedor en Cloud Run.
-# (contenido por definir)
+FROM node:20-slim
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production
+COPY . .
+EXPOSE 8080
+CMD ["npm", "start"]
