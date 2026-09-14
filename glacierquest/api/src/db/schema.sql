@@ -1,6 +1,12 @@
 -- Glacier Quest — schema for the single shared room.
 -- Run this once against your database (local Postgres for dev,
 -- Cloud SQL for the real deployment) to create all tables.
+--
+-- Local dev:
+--   psql -h localhost -U postgres -d glacierquest -f src/db/schema.sql
+--
+-- Cloud SQL (only while the instance is running, to avoid idle cost):
+--   psql "host=<CLOUD_SQL_IP> dbname=glacierquest user=postgres" -f src/db/schema.sql
 
 CREATE TABLE IF NOT EXISTS players (
   id            SERIAL PRIMARY KEY,
