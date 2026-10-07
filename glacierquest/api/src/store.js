@@ -12,40 +12,9 @@ class MemoryStore {
   async chat(p, body) { const m = { id: require('node:crypto').randomUUID(), player_name: p.name, body, createdAt: Date.now() }; this.messages.push(m); this.messages = this.messages.slice(-30); return m; }
   async health() { return true; }
 }
-class FirestoreStore {
-  constructor() {
-    const { Firestore } = require('@google-cloud/firestore');
-    this.db = new Firestore({ databaseId: '(default)' }); this.kind = 'firestore';
-  }
-  ref(id) { return this.db.collection('players').doc(id); }
-  async create(p) { await this.ref(p.id).create(p); }
-  async get(id) { return (await this.ref(id).get()).data(); }
-  async mutate(id, fn) {
-    return this.db.runTransaction(async tx => {
-      const ref = this.ref(id); const snap = await tx.get(ref);
-      if (!snap.exists) fail(401, 'Sesión expirada; vuelve a entrar');
-      const next = fn(snap.data()); tx.set(ref, next); return next;
-    });
-  }
-  async heartbeat(p, pos) { await this.db.collection('presence').doc(p.id).set({ id: p.id, name: p.name, x: pos.x, y: pos.y, seenAt: Date.now() }); }
-  async room() {
-    const [people, chat] = await Promise.all([
-      this.db.collection('presence').where('seenAt', '>', Date.now() - 30000).orderBy('seenAt', 'desc').limit(40).get(),
-      this.db.collection('rooms').doc('plaza').get()
-    ]);
-    return { players: people.docs.map(d => d.data()), messages: chat.data()?.messages || [] };
-  }
-  async chat(p, body) {
-    const m = { id: require('node:crypto').randomUUID(), player_name: p.name, body, createdAt: Date.now() };
-    const ref = this.db.collection('rooms').doc('plaza');
-    await this.db.runTransaction(async tx => { const snap = await tx.get(ref); tx.set(ref, { messages: [...(snap.data()?.messages || []), m].slice(-30) }); });
-    return m;
-  }
-  async health() { await this.db.collection('rooms').doc('plaza').get(); return true; }
-}
 function createStore(kind) {
-  if (kind === 'firestore') return new FirestoreStore();
+  if (kind === 'postgres') return new (require('./postgres').PostgresStore)();
   if (kind === 'memory' && process.env.NODE_ENV !== 'production') return new MemoryStore();
   throw new Error('Invalid STORE; memory is local-only');
 }
-module.exports = { MemoryStore, FirestoreStore, createStore };
+module.exports = { MemoryStore, createStore };

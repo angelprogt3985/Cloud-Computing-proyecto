@@ -11,18 +11,9 @@ provider "google" {
   region  = var.region
 }
 resource "google_project_service" "apis" {
-  for_each           = toset(["run.googleapis.com", "firestore.googleapis.com", "storage.googleapis.com", "secretmanager.googleapis.com", "artifactregistry.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com", "logging.googleapis.com", "monitoring.googleapis.com"])
+  for_each           = toset(["run.googleapis.com", "sqladmin.googleapis.com", "storage.googleapis.com", "secretmanager.googleapis.com", "artifactregistry.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com", "logging.googleapis.com", "monitoring.googleapis.com"])
   service            = each.value
   disable_on_destroy = false
-}
-resource "google_firestore_database" "game" {
-  project                 = var.project_id
-  name                    = "(default)"
-  location_id             = var.region
-  type                    = "FIRESTORE_NATIVE"
-  deletion_policy         = "ABANDON"
-  delete_protection_state = "DELETE_PROTECTION_ENABLED"
-  depends_on              = [google_project_service.apis]
 }
 resource "google_artifact_registry_repository" "images" {
   location               = var.region
@@ -62,3 +53,11 @@ resource "google_secret_manager_secret" "demo" {
   depends_on = [google_project_service.apis]
 }
 # Secret values are added with gcloud, never stored in Terraform state.
+
+resource "google_secret_manager_secret" "db" {
+  secret_id = "glacierquest-db-password"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.apis]
+}

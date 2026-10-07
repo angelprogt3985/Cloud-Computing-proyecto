@@ -1,3 +1,7 @@
-# Servicios y roles
+# Servicios y correspondencia con los labs
 
-La matriz actual y su evidencia están en [architecture.md](architecture.md). Son Cloud Run, Firestore Native, Cloud Storage, IAM, Secret Manager, Observability, GitHub Actions y Artifact Registry. SQL, CDN e IA no forman parte de esta iteración.
+El plan actualizado está en [Plan de servicios](02_Plan_de_servicios.md) y su PDF.
+
+Conteo principal: Cloud Run, Cloud SQL, Cloud Storage, IAM, Observabilidad (Logging y Monitoring juntos), GitHub Actions y Pub/Sub. Pub/Sub está planificado, no implementado ni desplegado. Secret Manager y Artifact Registry permanecen como apoyo técnico fuera del conteo. Terraform es herramienta de IaC, no un octavo servicio.
+
+Los títulos confirman IAM, Storage, SQL, Observabilidad, Pub/Sub y Terraform. Cloud Run y GitHub Actions encajan en Serverless y DevOps/Deployment, pero los títulos no confirman la herramienta exacta del lab.

@@ -5,3 +5,7 @@ github_owner_id = "123456"
 region = "us-central1"
 deploy_app = false
 image = ""
+
+enable_database = false
+sql_activation_policy = "ALWAYS"
+db_secret_version = "1"

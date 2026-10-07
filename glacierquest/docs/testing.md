@@ -1,25 +1,9 @@
-# Pruebas reproducibles
+# Pruebas
 
-Desde glacierquest: `npm ci --ignore-scripts --prefix api`, después `npm test --prefix api`. Pruebas HTTP usan un puerto temporal y no necesitan credenciales ni nube.
+Desde glacierquest: `npm ci --ignore-scripts --prefix api` y `npm test --prefix api`. Las pruebas HTTP abren un puerto temporal y no requieren nube.
 
-## Firestore con emulador
+Para PostgreSQL real, seguir README con Docker Compose y ejecutar `npm run test:postgres --prefix api` con TEST_DATABASE_URL apuntando a una base local desechable con el esquema aplicado. La prueba verifica persistencia entre conexiones, bloqueo de turno concurrente y presencia. Se omite si la variable falta; no considerar una prueba omitida como aprobada.
 
-El emulador permite probar el SDK GCP sin cargos. No es Firebase como servicio desplegado. Instalar Google Cloud CLI y su componente oficial: `gcloud components install cloud-firestore-emulator`. Ejecutar en una terminal `gcloud emulators firestore start --host-port=127.0.0.1:8787`. En otra terminal PowerShell:
+Prueba manual: entrar, mover por clic, recoger moneda, atacar al guardián, defender ante ventisca, curar y huir. Recargar conserva la sesión de esa pestaña; reiniciar el servidor en memoria elimina los datos. Con PostgreSQL, comprobar también el reinicio del servidor manteniendo la misma SESSION_SECRET.
 
-```powershell
-$env:FIRESTORE_EMULATOR_HOST='127.0.0.1:8787'
-$env:GCLOUD_PROJECT='glacierquest-test'
-npm run test:firestore --prefix api
-```
-
-La prueba comprueba persistencia entre dos clientes y exclusión de turnos concurrentes. Sin FIRESTORE_EMULATOR_HOST se omite explícitamente: una prueba omitida no prueba la integración. Nunca establecer ese valor en Cloud Run.
-
-## Carga
-
-Arrancar API local y ejecutar `node api/test/load.js`. Crea treinta jugadores y sincroniza doce veces cada cinco segundos; informa p95 y falla ante cualquier HTTP no exitoso. Para nube, establecer TEST_URL y DEMO_CODE en el entorno únicamente cuando el equipo autorice la prueba y conozca el costo; crea datos de prueba reales. Repetir después de cada cambio relevante de arquitectura o de región.
-
-## Navegador
-
-Ingresar en dos pestañas independientes, moverse por clic, esperar la sincronización y enviar chat. Recoger cada objeto, recargar y confirmar que no reaparece ni duplica monedas. Entrar al duelo, atacar durante la carga, defender frente a la ventisca, curar y huir. Hacer doble clic rápido en ataque: no deben resolverse dos copias del mismo turno. Cerrar el panel conserva el duelo; reabrir lo continúa. La derrota permite un nuevo duelo con salud restaurada tras diez segundos.
-
-Comprobar desconexión del servidor, HTTP 503 si falla la base y error de Storage sin fallback en nube. Revisar presentación en móvil y escritorio. El número de jugadores es limitado; no es una prueba de MMO masivo.
+La carga futura se prueba con `node api/test/load.js`: 30 jugadores, 12 ciclos a intervalos de cinco segundos. No ejecutar contra nube sin conocer el costo y sin TEST_URL y DEMO_CODE correctos. La presentación multijugador pública no forma parte de la aceptación de esta preentrega.

@@ -1,6 +1,6 @@
 {
   "name": "glacierquest-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -8,12 +8,12 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
-    "test:firestore": "node --test test/firestore.integration.js"
+    "test:postgres": "node --test test/postgres.integration.js"
   },
   "dependencies": {
     "express": "^5.2.1",
-    "@google-cloud/firestore": "^8.0.0",
-    "@google-cloud/storage": "^7.0.0"
+    "@google-cloud/storage": "^7.0.0",
+    "pg": "^8.16.0"
   },
   "overrides": {
     "proxy-addr": "^2.0.8",

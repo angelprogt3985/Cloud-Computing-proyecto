@@ -72,11 +72,11 @@ function createApp({ store, secret, demoCode, logger = console.log }) {
   }
   app.get('/api/services', async (req, res) => {
     let database = 'error'; let asset = 'error';
-    try { await store.health(); database = store.kind === 'firestore' ? 'conexión verificada' : 'memoria local, no nube'; } catch {}
+    try { await store.health(); database = store.kind === 'postgres' ? (process.env.K_SERVICE ? 'PostgreSQL conectado; verificar instancia Cloud SQL en consola' : 'PostgreSQL local conectado') : 'memoria local, no nube'; } catch {}
     try { assetCache = await loadAsset(); asset = assetCache.source; } catch {}
     res.json({ checkedAt: new Date().toISOString(), services: [
       { name: 'Cloud Run', status: process.env.K_SERVICE ? 'ejecutándose en Cloud Run' : 'servidor local' },
-      { name: 'Firestore', status: database }, { name: 'Cloud Storage', status: asset },
+      { name: 'Cloud SQL PostgreSQL', status: database }, { name: 'Cloud Storage', status: asset },
       { name: 'IAM', status: 'verificar roles y cuenta de servicio en consola' },
       { name: 'Secret Manager', status: process.env.K_SERVICE ? 'verificar referencia de secretos en revisión' : 'clave efímera local' },
       { name: 'Observability', status: 'logs JSON implementados; verificar recepción y panel en consola' },

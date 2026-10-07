@@ -1,14 +1,12 @@
-# Despliegue paso a paso
+# Despliegue futuro en Google Cloud
 
-Estado: código preparado; hace falta el proyecto GCP con facturación y el repositorio de GitHub. No se creó infraestructura ni se gastó crédito en esta iteración. Comandos de nube escritos para Bash en Google Cloud Shell. Para el juego local, ver README.
+Guía para ejecutar cuando el equipo tenga cuenta, facturación y repositorio. No es necesario completar estas etapas para abrir la demo local. Firestore no se utiliza. Comandos de nube en Bash de Google Cloud Shell.
 
-## 1 Preparar la cuenta
+## 1 Proyecto y permisos
 
-Crear o seleccionar un proyecto dedicado, habilitar facturación y crear alertas de presupuesto de USD 5 y USD 10. Un presupuesto avisa; no corta el gasto. Elegir `us-central1` para mantener los recursos juntos y usar cuotas gratuitas regionales cuando apliquen. No crear Firebase.
+Crear un proyecto dedicado y alertas de presupuesto. Elegir us-central1 y revisar precios. La cuenta humana de bootstrap necesita administrar APIs, IAM, SQL, Run, secretos, buckets, registro y paneles. No asignar Owner ni Editor a runtime/deploy. No compartir estado Terraform por Git; usar un único operador o un backend remoto protegido.
 
-La persona que prepara infraestructura necesita permisos para habilitar APIs, crear Firestore, buckets, secretos, repositorios, Cloud Run, paneles e identidades y configurar sus políticas IAM. Usar una cuenta administradora temporal del proyecto de clase para bootstrap; no asignar Owner o Editor a las cuentas de la aplicación o CI. La organización puede impedir `allUsers`: en ese caso resolver la política con su administrador antes de publicar.
-
-En Cloud Shell, clonar el repositorio y entrar a `glacierquest`. Terraform y Docker deben estar disponibles. Los workflows deben estar en `.github/workflows` de la RAÍZ del repositorio, al mismo nivel que `glacierquest`, no dentro de esa carpeta. Si cambian la estructura, ajustar sus rutas.
+Clonar el repositorio y entrar a glacierquest. Los workflows deben estar en .github/workflows de la raíz del repositorio. En Cloud Shell, autenticar la cuenta autorizada y el proyecto:
 
 ```bash
 gcloud config set project YOUR_PROJECT_ID
@@ -16,34 +14,41 @@ gcloud auth application-default login
 cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
 ```
 
-Editar `terraform.tfvars`: project_id, OWNER/REPOSITORY, ID numérico del repositorio y del propietario. Se obtienen desde `https://api.github.com/repos/OWNER/REPOSITORY` (campos id y owner.id) con acceso autorizado. No son secretos. Mantener `deploy_app=false`. Si ya existe Firestore `(default)`, importarlo antes de aplicar y ajustar región al recurso existente; su ubicación no se cambia en sitio.
+Editar project_id, github_repository (OWNER/REPO), github_repository_id y github_owner_id. Los IDs numéricos se obtienen de la API autorizada de GitHub o del administrador del repositorio. Mantener enable_database=false y deploy_app=false para la fase de preparación. Si ya existen recursos con esos nombres, conciliarlos/importarlos antes de aplicar.
 
 ```bash
 terraform -chdir=infra/terraform init
 terraform -chdir=infra/terraform fmt -check
 terraform -chdir=infra/terraform validate
-# SOLO si la base ya existe, sustituir el ID:
-# terraform -chdir=infra/terraform import google_firestore_database.game 'projects/YOUR_PROJECT_ID/databases/(default)'
 terraform -chdir=infra/terraform plan -out=bootstrap.plan
 terraform -chdir=infra/terraform apply bootstrap.plan
 ```
 
-Revisar el plan antes de aplicarlo. Guardar el estado de Terraform fuera de Git y compartirlo con control de acceso. Esta versión usa estado local; para colaborar, migrarlo después a un backend GCS protegido y con versionado. No ejecutar dos apply simultáneamente.
+Este paso crea recursos de preparación, no la base ni la app. Revisar el plan: no ejecutar apply solo para probar la demo local. Terraform no contiene los valores de secretos.
 
-## 2 Añadir secretos sin guardarlos en Git ni Terraform
+## 2 Preparar las tres versiones de secretos
 
-Ejecutar una vez después del bootstrap. La clave se genera sin imprimirla. Elegir un código privado para la clase; no reutilizar contraseñas personales. Las versiones nuevas comienzan normalmente en 1; verificar los números devueltos y ajustar `session_secret_version` y `demo_secret_version` en tfvars. No usar `latest` para una rotación silenciosa.
+En Secret Manager, agregar versiones de glacierquest-session (clave aleatoria de al menos 32 caracteres), glacierquest-demo-code (código compartido para la clase) y glacierquest-db-password (contraseña única para el usuario SQL). No escribir valores en Git ni en el PDF. Registrar solo los números de versión y completar session_secret_version, demo_secret_version y db_secret_version en tfvars.
+
+Se puede generar la clave de sesión sin imprimirla usando:
 
 ```bash
 openssl rand -hex 32 | tr -d '\n' | gcloud secrets versions add glacierquest-session --data-file=-
-read -rs -p 'Código para la clase: ' CLASS_CODE
-printf '%s' "$CLASS_CODE" | gcloud secrets versions add glacierquest-demo-code --data-file=-
-unset CLASS_CODE
 ```
 
-## 3 Construir la imagen y desplegar
+Para los otros secretos usar el formulario seguro de Secret Manager. La contraseña SQL guardada debe coincidir exactamente con la que se asignará al login glacierquest. No usar las credenciales de Compose en nube.
 
-Desde `glacierquest`, en Cloud Shell:
+## 3 Habilitar Cloud SQL cuando se vaya a usar
+
+Editar enable_database=true; conservar deploy_app=false. Revisar plan y aplicar. La instancia propuesta es PostgreSQL 16 Enterprise db-f1-micro, zona única, 10 GiB SSD. No incluye backups automáticos para esta demo; exportar antes de retirar datos. Tiene protección contra borrado.
+
+En la consola Cloud SQL, configurar una contraseña de administrador si es necesaria y crear el usuario integrado glacierquest con la contraseña del secreto. Abrir Cloud SQL Studio como administrador, seleccionar la base glacierquest y ejecutar el contenido completo de api/sql/001-schema.sql y api/sql/002-runtime-grants.sql. Si la creación del usuario le asignó cloudsqlsuperuser, ejecutar como administrador `REVOKE cloudsqlsuperuser FROM glacierquest;`. Runtime necesita solo conexión, uso de esquema y SELECT/INSERT/UPDATE/DELETE sobre las tres tablas, no privilegios administrativos.
+
+Studio es una opción; como alternativa usar Cloud SQL Auth Proxy oficial ligado a 127.0.0.1 y psql con un usuario administrador. No añadir una red 0.0.0.0/0. La aplicación no crea tablas al iniciar: si no se aplicó el esquema, /health devuelve fallo y hay que completar la migración.
+
+## 4 Construir y desplegar la aplicación
+
+Desde glacierquest, con Docker y Node disponibles en Cloud Shell:
 
 ```bash
 PROJECT_ID=$(gcloud config get-value project)
@@ -56,7 +61,7 @@ docker build -t "$IMAGE" .
 docker push "$IMAGE"
 ```
 
-Editar `terraform.tfvars`: `deploy_app=true`, `image` con la ruta subida y las versiones de secretos correctas. IAM puede tardar unos minutos en propagarse; si hay un 403 al crear la revisión, revisar el binding y reintentar después de su propagación.
+Editar image con esa ruta y deploy_app=true. Confirmar que enable_database continúa true y SQL está encendida. Revisar plan y aplicar:
 
 ```bash
 terraform -chdir=infra/terraform plan -out=app.plan
@@ -65,22 +70,22 @@ URL=$(terraform -chdir=infra/terraform output -raw url)
 curl --fail "$URL/health"
 ```
 
-Esperado: status ok, database firestore, cloud true. Abrir URL, introducir código de clase y recoger una moneda. Recargar la pestaña y comprobar el inventario. Revisar Firestore en GCP, el banner en Storage y una petición en Logging. Si una dependencia falla, reparar la conexión; no cambiar a memoria para aparentar un despliegue funcional.
+Respuesta esperada: status ok, database postgres, cloud true. Abrir la URL, entrar con código de clase, recoger objeto y recargar. Verificar la fila SQL y el banner del bucket. La URL run.app ofrece HTTPS sin comprar IP fija ni balanceador web. Si la organización bloquea acceso público allUsers, coordinar la política con su administrador; no eludirla.
 
-## 4 Activar CI y CD
+## 5 CI/CD y evidencia
 
-Crear el entorno GitHub `class-demo` y estas variables de repositorio o entorno, tomadas de las salidas de Terraform: GCP_PROJECT_ID, WIF_PROVIDER, DEPLOY_SERVICE_ACCOUNT y ASSET_BUCKET. No subir un archivo JSON de clave de cuenta de servicio.
+Crear entorno GitHub class-demo. Configurar GCP_PROJECT_ID, WIF_PROVIDER, DEPLOY_SERVICE_ACCOUNT y ASSET_BUCKET como variables, usando salidas de Terraform. Proteger main. El workflow de validación corre con push/PR; Deploy Glacier Quest se lanza manualmente desde main y actualiza el servicio existente. Utiliza OIDC; no subir claves JSON.
 
-El workflow `Validate Glacier Quest` corre con push/PR y ejecuta pruebas, build Docker y validación Terraform. `Deploy Glacier Quest` se lanza manualmente desde Actions en main; vuelve a probar, obtiene credenciales temporales por OIDC, sube imagen con SHA, actualiza el banner y la revisión existente, y verifica `/health`. El despliegue manual evita publicar cada experimento o gastar minutos de CI innecesarios. Habilitar aprobación del entorno si el equipo la necesita.
+Guardar enlace al workflow, SHA/digest de imagen, revisión y URL. El pipeline comprueba salud SQL. Para rollback elegir la revisión anterior conocida y verificarla; Terraform ignora cambios de imagen para no revertir el despliegue de Actions. Cambiar esquema o secretos puede requerir coordinación adicional; no asumir rollback automático de datos.
 
-Terraform ignora cambios de la imagen después de crear Cloud Run para que un apply de infraestructura no revierta el despliegue de Actions. Para rollback, elegir la revisión anterior en Cloud Run o reasignar tráfico explícitamente. Conservar una imagen conocida y verificar salud después de revertir. Cambiar la clave de firma invalida sesiones existentes; planificar esa rotación fuera de la presentación.
+## 6 Operación y cierre
 
-## 5 Evidencias para M2
+Cerrar pestañas al terminar reduce polling; ocultarlas lo pausa. Cloud Run escala a cero cuando deja de recibir tráfico. Cloud SQL no escala a cero: revisar cómputo, disco e IPv4 ociosa. Detener temporalmente con sql_activation_policy=NEVER y aplicar solo tras revisar plan; volver a ALWAYS antes de una demo. Detener no garantiza factura cero.
 
-Capturar URL, proyecto seleccionado, revisión Cloud Run y `/health`. Capturar el documento Firestore antes y después de recolectar o ganar. Adjuntar diagrama y lista de servicios con estado real. Esto prueba al menos cómputo y base de datos. No mostrar valores de secretos ni tokens del navegador. Guardar fecha, commit y responsable de cada prueba en `docs/evidence.md`.
+Después de la calificación, exportar y verificar datos que se conserven. Terraform destroy requiere desactivar deliberadamente protección de SQL; además un bucket no vacío no se borra automáticamente. No eliminar recursos mientras se requiera la URL para evaluar. La limpieza es una acción posterior del equipo, no se ejecutó durante esta entrega.
 
-## 6 Cierre y costos
+## 7 Pub/Sub como etapa posterior del lab 18
 
-Cerrar las pestañas al terminar: una pestaña visible sigue sincronizando aunque el jugador esté quieto. Ocultarla pausa el polling. Cloud Run puede bajar a cero, pero esto no es un tope monetario. No configurar uptime checks que despierten la app cada minuto sin necesidad. La política del registro retiene tres versiones recientes y elimina las viejas de más de siete días; vigilar su almacenamiento.
+Esta fase aún no está implementada. Antes de desplegarla, añadir topic glacierquest-events y suscripción pull glacierquest-activity a Terraform; agregar tablas SQL de eventos de salida e historial; guardar el evento dentro de la transacción de victoria; construir el publicador y consumidor como un Cloud Run Job de ejecución finita; asignar permisos por topic y suscripción, y mostrar el historial en la UI.
 
-Antes de retirar el proyecto, exportar lo que deban conservar. `terraform destroy` no es un botón de apagado: Firestore tiene protección y política ABANDON; un bucket no vacío tampoco se elimina automáticamente. Revisar y borrar esos recursos de forma deliberada tras la calificación. No borrar el proyecto antes de entregar el video y la URL.
+El job se ejecutará manualmente para la presentación. Publicará pendientes y procesará mensajes, con confirmación después de persistir y deduplicación por ID de batalla/evento. Comprobar recuperación ante falla de publicación y reentrega sin duplicados. No se incluyen comandos de ejecución de un job que todavía no existe. Mantener Secret Manager y Artifact Registry como apoyo, sin contarlos para completar los siete.

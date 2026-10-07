@@ -16,7 +16,38 @@ resource "google_cloud_run_v2_service" "game" {
       min_instance_count = 0
       max_instance_count = 2
     }
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.game[0].connection_name]
+      }
+    }
     containers {
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
+      env {
+        name  = "DB_HOST"
+        value = "/cloudsql/${google_sql_database_instance.game[0].connection_name}"
+      }
+      env {
+        name  = "DB_NAME"
+        value = "glacierquest"
+      }
+      env {
+        name  = "DB_USER"
+        value = "glacierquest"
+      }
+      env {
+        name = "DB_PASSWORD"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.db.secret_id
+            version = var.db_secret_version
+          }
+        }
+      }
       image = var.image
       ports {
         container_port = 8080
@@ -34,7 +65,7 @@ resource "google_cloud_run_v2_service" "game" {
       }
       env {
         name  = "STORE"
-        value = "firestore"
+        value = "postgres"
       }
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
@@ -67,11 +98,11 @@ resource "google_cloud_run_v2_service" "game" {
   lifecycle {
     ignore_changes = [template[0].containers[0].image]
     precondition {
-      condition     = !var.deploy_app || length(var.image) > 0
-      error_message = "Provide an uploaded image before deploy_app=true."
+      condition     = !var.deploy_app || (length(var.image) > 0 && var.enable_database)
+      error_message = "Provide an uploaded image and enable_database=true before deploying the app."
     }
   }
-  depends_on = [google_project_service.apis, google_project_iam_member.database, google_secret_manager_secret_iam_member.session, google_secret_manager_secret_iam_member.demo, google_storage_bucket_iam_member.runtime]
+  depends_on = [google_project_service.apis, google_project_iam_member.database, google_secret_manager_secret_iam_member.session, google_secret_manager_secret_iam_member.db, google_secret_manager_secret_iam_member.demo, google_storage_bucket_iam_member.runtime]
 }
 resource "google_cloud_run_v2_service_iam_member" "public" {
   count    = var.deploy_app ? 1 : 0

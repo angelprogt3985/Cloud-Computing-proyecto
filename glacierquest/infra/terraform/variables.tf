@@ -31,3 +31,20 @@ variable "github_repository_id" {
 variable "github_owner_id" {
   type = string
 }
+
+variable "enable_database" {
+  type    = bool
+  default = false
+}
+variable "sql_activation_policy" {
+  type    = string
+  default = "ALWAYS"
+  validation {
+    condition     = contains(["ALWAYS", "NEVER"], var.sql_activation_policy)
+    error_message = "Use ALWAYS or NEVER."
+  }
+}
+variable "db_secret_version" {
+  type    = string
+  default = "1"
+}

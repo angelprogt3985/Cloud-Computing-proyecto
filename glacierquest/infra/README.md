@@ -1,3 +1,3 @@
-# Infraestructura
+# Infraestructura por etapas
 
-Terraform implementa la arquitectura económica en GCP. Consultar [la guía completa](../docs/deployment-steps.md) antes de aplicar. Bootstrap con deploy_app=false, añadir secretos y subir imagen; después deploy_app=true. No hay Cloud SQL ni Cloud CDN.
+Cloud SQL PostgreSQL es la base prevista. No hay Firestore ni Cloud CDN. Por defecto enable_database=false y deploy_app=false. Consulte [despliegue](../docs/deployment-steps.md) y el [plan](../docs/02_Plan_de_servicios.md). Un apply puede crear recursos de preparación; revisar siempre el plan.

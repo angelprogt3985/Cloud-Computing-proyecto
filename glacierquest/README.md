@@ -1,40 +1,63 @@
-# Glacier Quest 0.2
+# Glacier Quest 0.3 - Preentrega
 
-Avance del curso Cloud Computing 2026. Mundo social pequeño con movimiento por clic, chat, objetos persistentes y duelo por turnos. El foco es demostrar servicios de nube.
+Proyecto de Cloud Computing. Esta entrega prioriza los servicios y sus etapas de integración. No utiliza Firestore. La base prevista es PostgreSQL en Cloud SQL.
 
-## Probar ahora en Windows
+## Abrir la demo local
 
-Abrir `start-local.cmd` y visitar http://localhost:8080. Requiere Node.js 22 o superior. Elegir nombre y dejar el código de clase vacío. Abrir otra pestaña para un segundo jugador.
+Requiere Node.js 22 o superior. En Windows ejecutar `start-local.cmd` y abrir http://localhost:8080. Código de clase vacío. La instalación inicial requiere internet. El modo memoria pierde sus datos al cerrar el servidor y se identifica como local en pantalla.
 
-También puede iniciarse desde esta carpeta:
+Alternativa desde esta carpeta:
 
 ```powershell
 npm ci --ignore-scripts --prefix api
 npm start --prefix api
 ```
 
-El modo local usa memoria y un recurso visual local. Se identifica así en pantalla y pierde datos al reiniciar el servidor. No necesita Docker, PostgreSQL ni una cuenta GCP. No abrir index.html directamente: el servidor entrega web y API juntas.
+Si 8080 está ocupado, cerrar el servidor anterior o usar `$env:PORT='8081'` y abrir ese puerto. No abrir index.html directamente.
 
-## Qué cambió
+## Qué funciona
 
-- Clic o toque para moverse; flechas como alternativa con el mapa enfocado.
-- Enemigo con salud, contraataque y patrón anunciado; ataque, defensa, dos curaciones y retirada.
-- Sesiones firmadas por jugador, recompensa transaccional y recolección sin duplicados.
-- Firestore vía GCP reemplaza SQL; Storage privado conserva el banner; Cloud Run ofrece HTTPS sin balanceador/CDN.
-- Panel de servicios que distingue modo local, conexión comprobada y evidencia pendiente.
-- Terraform, Docker, CI y despliegue manual por GitHub Actions con identidad federada.
+Movimiento por clic/toque, chat, objetos recogibles, sesiones individuales y combate con ataque, defensa, curación, retirada y respuesta del enemigo. Panel que distingue servicios locales de comprobaciones de nube pendientes.
 
-## Estado real
+## Probar PostgreSQL local cuando corresponda
 
-Juego y API probados localmente; infraestructura validada con Terraform. No se desplegó en GCP: faltan ID del proyecto, facturación, acceso y repositorio. La entrega M2 del 9 de octubre exige dos servicios realmente activos; el modo local no cumple ese requisito.
+Con Docker Desktop disponible:
+
+```powershell
+docker compose up -d
+$env:STORE='postgres'
+$env:DB_HOST='127.0.0.1'
+$env:DB_USER='glacierquest'
+$env:DB_PASSWORD='local-demo-only'
+$env:DB_NAME='glacierquest'
+$env:SESSION_SECRET='local-only-key-change-before-cloud-123456'
+npm start --prefix api
+```
+
+El esquema se carga al crear el volumen por primera vez. `docker compose down` detiene sin borrar datos. No usar `down -v` si desean conservarlos. Estas credenciales son exclusivamente locales, nunca para nube.
+
+## Pruebas
+
+`npm test --prefix api` ejecuta lógica y HTTP en memoria. Para integración SQL con la base local anterior:
+
+```powershell
+$env:TEST_DATABASE_URL='postgres://glacierquest:local-demo-only@127.0.0.1:5432/glacierquest'
+npm run test:postgres --prefix api
+```
+
+La prueba SQL se omite sin esa variable; requiere una base desechable de pruebas con esquema aplicado. No se ejecutó contra un PostgreSQL real en esta entrega.
 
 ## Documentación
 
-- `docs/architecture.md`: arquitectura, ocho servicios y correspondencia con la rúbrica.
-- `docs/deployment-steps.md`: preparación, secretos, despliegue y CI/CD.
-- `docs/cost-estimate.md`: escenarios y fuentes de precios.
-- `docs/security-considerations.md`: IAM, sesiones y límites.
-- `docs/testing.md` y `docs/evidence.md`: pruebas y guion de presentación.
-- `docs/Glacier_Quest_Avance.pdf`: informe para compartir.
+- `docs/01_Cambios_realizados.pdf`: qué se cambió, comprobaciones y límites.
+- `docs/02_Plan_de_servicios.pdf`: siete servicios previstos, relación con los labs, etapas, arquitectura, despliegue y costos; Pub/Sub pendiente y componentes de apoyo fuera del conteo.
+- Versiones editables de ambos documentos en `.md`.
+- `docs/deployment-steps.md`: comandos de configuración para la etapa de nube.
 
-Las carpetas de código SQL anterior fueron retiradas de esta versión; no se migró ni eliminó una base externa. Los documentos originales de referencia permanecen intactos. Los workflows están en la raíz del repositorio, fuera de glacierquest.
+El ZIP conserva la estructura del repositorio: `.github/workflows` está en la raíz, junto a `glacierquest`. Descomprimir el ZIP completo; no copiar únicamente la carpeta interior si quieren usar Actions. El Dockerfile válido es `glacierquest/Dockerfile`.
+
+No se desplegó en GCP ni se contrataron servicios. La configuración no crea Cloud SQL ni Cloud Run por defecto. El requisito formal M2 de dos servicios desplegados sigue pendiente hasta que el equipo lo complete con su cuenta.
+
+## Alineación con laboratorios
+
+El plan de servicios fue ajustado a los labs compartidos por el equipo. Pub/Sub (lab 18) se incorpora al plan principal como etapa futura, todavía sin implementación. Secret Manager y Artifact Registry se conservan como apoyo, fuera del conteo de siete. El PDF de servicios distingue menciones explícitas de inferencias: los títulos Serverless/DevOps no confirman por sí solos Cloud Run/GitHub Actions. No se cambió el comportamiento del juego en esta revisión documental.

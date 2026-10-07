@@ -13,3 +13,7 @@ output "asset_bucket" {
 output "image_repository" {
   value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.images.repository_id}"
 }
+
+output "sql_connection_name" {
+  value = var.enable_database ? google_sql_database_instance.game[0].connection_name : null
+}

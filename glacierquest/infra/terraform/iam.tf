@@ -10,7 +10,7 @@ resource "google_service_account" "deploy" {
 }
 resource "google_project_iam_member" "database" {
   project = var.project_id
-  role    = "roles/datastore.user"
+  role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 resource "google_secret_manager_secret_iam_member" "session" {
@@ -56,4 +56,10 @@ resource "google_service_account_iam_member" "github" {
   service_account_id = google_service_account.deploy.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repository}"
+}
+
+resource "google_secret_manager_secret_iam_member" "db" {
+  secret_id = google_secret_manager_secret.db.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
 }
