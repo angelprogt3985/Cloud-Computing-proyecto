@@ -1,0 +1,33 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { createApp } = require('../src/app');
+const { MemoryStore } = require('../src/store');
+test('HTTP integration: sessions, chat, collection, combat, failures and service evidence',async t=>{
+  const store=new MemoryStore();const logs=[];
+  const app=createApp({store,secret:'test-secret-not-used-in-production',demoCode:'class',logger:x=>logs.push(x)});
+  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
+  const base=`http://127.0.0.1:${server.address().port}`;
+  async function call(route,body,token){const r=await fetch(base+route,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});return {status:r.status,data:await r.json()};}
+  assert.equal((await call('/api/join',{name:'A',code:'bad'})).status,403);
+  const a=(await call('/api/join',{name:'A',code:'class'})).data;
+  const b=(await call('/api/join',{name:'A',code:'class'})).data;
+  assert.notEqual(a.player.id,b.player.id);
+  assert.equal((await call('/api/me')).status,401);
+  assert.equal((await call('/api/me',undefined,a.token+'x')).status,401);
+  const sync=await call('/api/sync',{x:320,y:340},a.token);assert.equal(sync.data.players.length,2);assert.equal(sync.data.players[0].battle,undefined);
+  assert.equal((await call('/api/chat',{body:{bad:true}},a.token)).status,400);
+  assert.equal((await call('/api/chat',{body:'Hola'},a.token)).status,201);
+  assert.equal((await call('/api/sync',{x:320,y:340},b.token)).data.messages[0].body,'Hola');
+  assert.equal((await call('/api/collect',{itemId:'c1',x:120,y:320,playerId:b.player.id},a.token)).data.player.id,a.player.id);
+  assert.equal((await call('/api/me',undefined,b.token)).data.player.coins,0);
+  const start=(await call('/api/battle/start',{x:520,y:160},a.token)).data.player;
+  const payload={action:'attack',battleId:start.battle.id,turn:0};
+  const concurrent=await Promise.all([call('/api/battle/turn',payload,a.token),call('/api/battle/turn',payload,a.token)]);
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[200,409]);
+  assert.equal((await call('/api/me',undefined,a.token)).data.player.battle.turn,1);
+  const services=await call('/api/services',undefined,a.token);assert.equal(services.status,200);assert.match(services.data.services[1].status,/local/);
+  const asset=await fetch(base+'/api/asset',{headers:{Authorization:'Bearer '+a.token}});assert.equal(asset.status,200);assert.match(await asset.text(),/<svg/);
+  assert.equal((await fetch(base+'/')).status,200);
+  store.health=async()=>{throw new Error('secret db detail');};assert.equal((await call('/health')).status,503);
+  assert.ok(logs.every(x=>!x.includes(a.token)));
+});

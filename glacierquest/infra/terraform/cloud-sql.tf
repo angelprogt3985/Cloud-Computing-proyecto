@@ -1,1 +1,1 @@
-# Recurso: instancia de Cloud SQL (PostgreSQL) - por definir
+# Retired: Firestore via GCP replaces Cloud SQL. No SQL resource is provisioned.
