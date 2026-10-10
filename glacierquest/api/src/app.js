@@ -72,16 +72,18 @@ function createApp({ store, secret, demoCode, logger = console.log }) {
   }
   app.get('/api/services', async (req, res) => {
     let database = 'error'; let asset = 'error';
-    try { await store.health(); database = store.kind === 'postgres' ? (process.env.K_SERVICE ? 'PostgreSQL conectado; verificar instancia Cloud SQL en consola' : 'PostgreSQL local conectado') : 'memoria local, no nube'; } catch {}
+    try { await store.health(); database = store.kind === 'firestore' ? (process.env.FIRESTORE_EMULATOR_HOST ? 'emulador local; no nube' : 'Firestore conectado; fuera del conteo académico') : store.kind === 'postgres' ? (process.env.K_SERVICE ? 'PostgreSQL conectado; verificar instancia Cloud SQL en consola' : 'PostgreSQL local conectado') : 'memoria local, no nube'; } catch {}
     try { assetCache = await loadAsset(); asset = assetCache.source; } catch {}
     res.json({ checkedAt: new Date().toISOString(), services: [
       { name: 'Cloud Run', status: process.env.K_SERVICE ? 'ejecutándose en Cloud Run' : 'servidor local' },
-      { name: 'Cloud SQL PostgreSQL', status: database }, { name: 'Cloud Storage', status: asset },
+      { name: store.kind === 'firestore' ? 'Firestore (no cuenta)' : store.kind === 'postgres' ? 'PostgreSQL' : 'Base local', status: database }, { name: 'Cloud Storage', status: asset },
       { name: 'IAM', status: 'verificar roles y cuenta de servicio en consola' },
-      { name: 'Secret Manager', status: process.env.K_SERVICE ? 'verificar referencia de secretos en revisión' : 'clave efímera local' },
+      { name: 'Secret Manager', status: process.env.K_SERVICE ? 'verificar referencia de secretos en revisión' : process.env.GQ_SECRET_SOURCE === 'gcloud-secret-manager' ? 'secretos cargados por el iniciador desde GCP; verificar versiones y permisos en consola' : 'clave local; sin evidencia de Secret Manager' },
       { name: 'Observability', status: 'logs JSON implementados; verificar recepción y panel en consola' },
       { name: 'GitHub Actions', status: 'verificar ejecución de despliegue en GitHub' },
-      { name: 'Artifact Registry', status: 'verificar imagen y digest en consola' }
+      { name: 'Artifact Registry (apoyo)', status: 'verificar imagen y digest en consola' },
+      { name: 'Cloud Tasks', status: 'planificado: trabajos diferidos; todavía no integrado' },
+      { name: 'Cloud Scheduler', status: 'planificado: limpieza periódica; todavía no integrado' }
     ] });
   });
   app.get('/api/asset', async (req, res) => {

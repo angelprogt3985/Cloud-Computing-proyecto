@@ -9,3 +9,6 @@ image = ""
 enable_database = false
 sql_activation_policy = "ALWAYS"
 db_secret_version = "1"
+
+# New low-cost path: enable only after reviewing the plan.
+enable_firestore = false

@@ -1,3 +1,5 @@
+> HIST”RICO (7 de octubre): sustituido por [arquitectura econÛmica](03_Arquitectura_economica.md) y [despliegue Firestore](despliegue-firestore.md). No seguir los pasos SQL para la ruta actual.
+
 # Despliegue futuro en Google Cloud
 
 Gu√≠a para ejecutar cuando el equipo tenga cuenta, facturaci√≥n y repositorio. No es necesario completar estas etapas para abrir la demo local. Firestore no se utiliza. Comandos de nube en Bash de Google Cloud Shell.

@@ -13,6 +13,7 @@ class MemoryStore {
   async health() { return true; }
 }
 function createStore(kind) {
+  if (kind === 'firestore') return new (require('./firestore').FirestoreStore)();
   if (kind === 'postgres') return new (require('./postgres').PostgresStore)();
   if (kind === 'memory' && process.env.NODE_ENV !== 'production') return new MemoryStore();
   throw new Error('Invalid STORE; memory is local-only');

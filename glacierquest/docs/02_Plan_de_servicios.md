@@ -1,3 +1,5 @@
+> HISTÓRICO (7 de octubre): sustituido por [arquitectura económica](03_Arquitectura_economica.md) y [despliegue Firestore](despliegue-firestore.md). No seguir los pasos SQL para la ruta actual.
+
 # Glacier Quest plan de servicios
 
 Arquitectura alineada con los labs Â· Preentrega Â· 7 de octubre de 2026

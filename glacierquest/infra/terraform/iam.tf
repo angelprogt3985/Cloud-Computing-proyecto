@@ -9,6 +9,7 @@ resource "google_service_account" "deploy" {
   depends_on   = [google_project_service.apis]
 }
 resource "google_project_iam_member" "database" {
+  count   = var.enable_database ? 1 : 0
   project = var.project_id
   role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.runtime.email}"
@@ -59,7 +60,8 @@ resource "google_service_account_iam_member" "github" {
 }
 
 resource "google_secret_manager_secret_iam_member" "db" {
-  secret_id = google_secret_manager_secret.db.id
+  count     = var.enable_database ? 1 : 0
+  secret_id = google_secret_manager_secret.db[0].id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }

@@ -1,5 +1,7 @@
 # Glacier Quest 0.3 - Preentrega
 
+**Inicio vigente:** [Conectar servicios desde cero](docs/04_Conexion_paso_a_paso.md). Primer paso: IAM + Storage + Secret Manager con servidor local mediante start-cloud-local.ps1. Cloud Tasks y Scheduler sustituyen el plan anterior de Pub/Sub, todavía pendientes. El juego no cambió en esta revisión.
+
 Proyecto de Cloud Computing. Esta entrega prioriza los servicios y sus etapas de integraciÃ³n. No utiliza Firestore. La base prevista es PostgreSQL en Cloud SQL.
 
 ## Abrir la demo local

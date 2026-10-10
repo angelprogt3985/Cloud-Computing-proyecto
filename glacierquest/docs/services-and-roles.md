@@ -1,3 +1,5 @@
+> HISTÓRICO (7 de octubre): sustituido por [arquitectura económica](03_Arquitectura_economica.md) y [despliegue Firestore](despliegue-firestore.md). No seguir los pasos SQL para la ruta actual.
+
 # Servicios y correspondencia con los labs
 
 El plan actualizado estÃ¡ en [Plan de servicios](02_Plan_de_servicios.md) y su PDF.

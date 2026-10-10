@@ -8,11 +8,13 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
-    "test:postgres": "node --test test/postgres.integration.js"
+    "test:postgres": "node --test test/postgres.integration.js",
+    "test:firestore": "node --test test/firestore.integration.js"
   },
   "dependencies": {
-    "express": "^5.2.1",
+    "@google-cloud/firestore": "^9.3.1",
     "@google-cloud/storage": "^7.0.0",
+    "express": "^5.2.1",
     "pg": "^8.16.0"
   },
   "overrides": {

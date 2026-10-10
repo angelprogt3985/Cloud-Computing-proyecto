@@ -11,7 +11,7 @@ provider "google" {
   region  = var.region
 }
 resource "google_project_service" "apis" {
-  for_each           = toset(["run.googleapis.com", "sqladmin.googleapis.com", "storage.googleapis.com", "secretmanager.googleapis.com", "artifactregistry.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com", "logging.googleapis.com", "monitoring.googleapis.com"])
+  for_each           = toset(["run.googleapis.com", "sqladmin.googleapis.com", "firestore.googleapis.com", "storage.googleapis.com", "secretmanager.googleapis.com", "artifactregistry.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com", "logging.googleapis.com", "monitoring.googleapis.com"])
   service            = each.value
   disable_on_destroy = false
 }
@@ -55,6 +55,7 @@ resource "google_secret_manager_secret" "demo" {
 # Secret values are added with gcloud, never stored in Terraform state.
 
 resource "google_secret_manager_secret" "db" {
+  count     = var.enable_database ? 1 : 0
   secret_id = "glacierquest-db-password"
   replication {
     auto {}
