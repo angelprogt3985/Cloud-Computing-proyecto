@@ -1,0 +1,12 @@
+**/node_modules/
+**/.terraform/
+**/*.tfstate*
+**/*.tfvars
+!**/*.tfvars.example
+**/.env
+**/.env.*
+!**/.env.example
+**/gha-creds-*.json
+**/application_default_credentials.json
+**/evidence/
+**/*.log

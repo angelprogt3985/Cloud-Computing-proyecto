@@ -1,3 +1,5 @@
+> Preentrega IAM/Actions: [guÃ­a vigente](docs/05_Preentrega_IAM_Actions.md). Proyecto GCP: `glacierquest`. El workflow de CI no despliega ni necesita credenciales GCP.
+
 # Glacier Quest 0.3 - Preentrega
 
 **Inicio vigente:** [Conectar servicios desde cero](docs/04_Conexion_paso_a_paso.md). Primer paso: IAM + Storage + Secret Manager con servidor local mediante start-cloud-local.ps1. Cloud Tasks y Scheduler sustituyen el plan anterior de Pub/Sub, todavía pendientes. El juego no cambió en esta revisión.
