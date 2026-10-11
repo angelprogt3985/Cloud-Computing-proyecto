@@ -1,8 +1,8 @@
-> Preentrega IAM/Actions: [guÃ­a vigente](docs/05_Preentrega_IAM_Actions.md). Proyecto GCP: `glacierquest`. El workflow de CI no despliega ni necesita credenciales GCP.
+> Estado vigente: [IAM y Actions](docs/06_Conexion_IAM_Actual.md). Proyecto: `glacier-quest-1791678996`. CI verificado; federaciÃ³n pendiente del propietario. Sin despliegue del juego.
 
 # Glacier Quest 0.3 - Preentrega
 
-**Inicio vigente:** [Conectar servicios desde cero](docs/04_Conexion_paso_a_paso.md). Primer paso: IAM + Storage + Secret Manager con servidor local mediante start-cloud-local.ps1. Cloud Tasks y Scheduler sustituyen el plan anterior de Pub/Sub, todavía pendientes. El juego no cambió en esta revisión.
+**Inicio vigente:** [Conectar servicios desde cero](docs/04_Conexion_paso_a_paso.md). Primer paso: IAM + Storage + Secret Manager con servidor local mediante start-cloud-local.ps1. Cloud Tasks y Scheduler sustituyen el plan anterior de Pub/Sub, todavï¿½a pendientes. El juego no cambiï¿½ en esta revisiï¿½n.
 
 Proyecto de Cloud Computing. Esta entrega prioriza los servicios y sus etapas de integraciÃ³n. No utiliza Firestore. La base prevista es PostgreSQL en Cloud SQL.
 
