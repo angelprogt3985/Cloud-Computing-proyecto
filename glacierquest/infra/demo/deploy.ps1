@@ -1,7 +1,8 @@
 param(
   [Parameter(Mandatory=$true)][ValidateSet('Provision','Build','Deploy')][string]$Stage,
   [Parameter(Mandatory=$true)][switch]$TrialVerified,
-  [string]$Image
+  [string]$Image,
+  [ValidateSet('memory','realtime')][string]$Store = 'realtime'
 )
 $ErrorActionPreference = 'Stop'
 if (-not $TrialVerified) { throw 'Verify Free trial account and remaining credit in Cloud Billing first.' }
@@ -67,5 +68,9 @@ if ($Stage -eq 'Build') {
 }
 if ($Stage -eq 'Deploy') {
   if ($Image -notmatch '^us-central1-docker\.pkg\.dev/glacier-quest-1791678996/glacierquest-demo/game@sha256:[a-f0-9]{64}$') { throw 'Deploy a verified immutable demo image digest' }
-  G run deploy glacierquest-demo --region=$region --image=$Image --service-account=$runtime --allow-unauthenticated --invoker-iam-check --min=0 --max=1 --min-instances=0 --max-instances=1 --concurrency=40 --cpu=1 --memory=512Mi --cpu-throttling --no-cpu-boost --timeout=30 --set-env-vars="STORE=memory,GQ_DEMO_MODE=true,ASSET_BUCKET=$assets" --set-secrets='SESSION_SECRET=glacierquest-demo-session:1,DEMO_CODE=glacierquest-demo-code:1' --labels='environment=demo,purpose=course-project' --format='value(status.url)'
+  $environment = "STORE=$Store,GQ_DEMO_MODE=true,ASSET_BUCKET=$assets"
+  if ($Store -eq 'realtime') {
+    $environment += ",FIREBASE_DATABASE_URL=https://glacier-quest-1791678996-demo.firebaseio.com,CLEANUP_AUDIENCE=https://glacierquest-demo-636305098699.us-central1.run.app,CLEANUP_SERVICE_ACCOUNT=glacierquest-cleanup@$project.iam.gserviceaccount.com"
+  }
+  G run deploy glacierquest-demo --region=$region --image=$Image --service-account=$runtime --allow-unauthenticated --invoker-iam-check --min=0 --max=1 --min-instances=0 --max-instances=1 --concurrency=40 --cpu=1 --memory=512Mi --cpu-throttling --no-cpu-boost --timeout=30 --set-env-vars=$environment --set-secrets='SESSION_SECRET=glacierquest-demo-session:1,DEMO_CODE=glacierquest-demo-code:1' --labels='environment=demo,purpose=course-project' --format='value(status.url)'
 }

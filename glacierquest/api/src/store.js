@@ -13,6 +13,7 @@ class MemoryStore {
   async health() { return true; }
 }
 function createStore(kind) {
+  if (kind === 'realtime') return new (require('./realtime').RealtimeStore)();
   if (kind === 'firestore') return new (require('./firestore').FirestoreStore)();
   if (kind === 'postgres') return new (require('./postgres').PostgresStore)();
   if (kind === 'memory' && (process.env.NODE_ENV !== 'production' || process.env.GQ_DEMO_MODE === 'true')) return new MemoryStore();

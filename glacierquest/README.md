@@ -1,10 +1,10 @@
-> Estado vigente: [Demo real y crédito de prueba](docs/07_Demo_cloud_y_creditos.md). Cloud Run con enlace público y código de clase + Cloud Storage + Secret Manager desplegados en `glacier-quest-1791678996`. [Abrir el juego](https://glacierquest-demo-636305098699.us-central1.run.app). Usa el código de clase; no necesitas localhost. Progreso temporal; base de datos pendiente. [Etapa anterior: IAM y Actions](docs/06_Conexion_IAM_Actual.md).
+> Estado vigente: [Firebase y Scheduler](docs/08_Firebase_y_Scheduler.md). Cloud Run con enlace público y código de clase + Cloud Storage + Secret Manager + Firebase Realtime Database desplegados en `glacier-quest-1791678996`. [Abrir el juego](https://glacierquest-demo-636305098699.us-central1.run.app). Usa el código de clase; no necesitas localhost. El progreso se guarda en Firebase. [Etapa anterior: demo y créditos](docs/07_Demo_cloud_y_creditos.md).
 
 # Glacier Quest 0.3 - Preentrega
 
-**Inicio vigente:** [Demo cloud y credito de prueba](docs/07_Demo_cloud_y_creditos.md). Los documentos 04/05 conservan planes anteriores. La base de datos y los demas servicios siguen pendientes.
+**Inicio vigente:** [Nueva base y servicio sustituto: Firebase + Scheduler](docs/08_Firebase_y_Scheduler.md). Los documentos 01–07 conservan las etapas anteriores.
 
-Proyecto de Cloud Computing. Esta entrega prioriza los servicios y sus etapas de integración. No utiliza Firestore. La base prevista es PostgreSQL en Cloud SQL.
+Proyecto de Cloud Computing. La base integrada ahora es Firebase Realtime Database, autorizada por el docente fuera del conteo de siete servicios. Cloud Scheduler sustituye el lugar de Cloud SQL en ese conteo. La demo publicada guarda el progreso en Firebase; la integración y sus verificaciones se detallan en el documento 08.
 
 ## Abrir la demo local
 
@@ -60,8 +60,8 @@ La prueba SQL se omite sin esa variable; requiere una base desechable de pruebas
 
 El ZIP conserva la estructura del repositorio: `.github/workflows` está en la raíz, junto a `glacierquest`. Descomprimir el ZIP completo; no copiar únicamente la carpeta interior si quieren usar Actions. El Dockerfile válido es `glacierquest/Dockerfile`.
 
-No se desplegó en GCP ni se contrataron servicios. La configuración no crea Cloud SQL ni Cloud Run por defecto. El requisito formal M2 de dos servicios desplegados sigue pendiente hasta que el equipo lo complete con su cuenta.
+La demo ya integra Cloud Run, Cloud Storage y Secret Manager, con IAM y Cloud Build para ejecutarla y desplegarla. No se ha creado Cloud SQL. Consultar los documentos 07 y 08 para separar recursos desplegados de trabajo pendiente.
 
 ## Alineación con laboratorios
 
-El plan de servicios fue ajustado a los labs compartidos por el equipo. Pub/Sub (lab 18) se incorpora al plan principal como etapa futura, todavía sin implementación. Secret Manager y Artifact Registry se conservan como apoyo, fuera del conteo de siete. El PDF de servicios distingue menciones explícitas de inferencias: los títulos Serverless/DevOps no confirman por sí solos Cloud Run/GitHub Actions. No se cambió el comportamiento del juego en esta revisión documental.
+Los PDFs conservan el plan anterior basado en los laboratorios. El plan actualizado de siete servicios está en el documento 08: Run, Storage, IAM, Secret Manager, Cloud Build, Logging + Monitoring y Scheduler. Firebase queda fuera del conteo; Artifact Registry apoya el despliegue. La aceptación académica depende de demostrar cada integración.

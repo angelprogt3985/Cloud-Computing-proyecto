@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('node:path');
 const { createHmac, timingSafeEqual, randomUUID } = require('node:crypto');
 const { NPC, ITEMS, fail, coordinates, newPlayer, startBattle, battleTurn, collect } = require('./game');
-function createApp({ store, secret, demoCode, logger = console.log }) {
+function createApp({ store, secret, demoCode, logger = console.log, maintenanceAuth = require('./maintenance').authorizeMaintenance }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '4kb' }));
@@ -37,6 +37,13 @@ function createApp({ store, secret, demoCode, logger = console.log }) {
     next();
   });
   app.get('/health', async (req, res) => { try { await store.health(); res.json({ status: 'ok', database: store.kind, cloud: !!process.env.K_SERVICE, demo: process.env.GQ_DEMO_MODE === 'true', ephemeral: store.kind === 'memory' }); } catch { res.status(503).json({ status: 'degraded', database: store.kind }); } });
+  app.post('/internal/cleanup', async (req, res) => {
+    if (!await maintenanceAuth(req)) return res.status(403).json({ error: 'Acceso restringido' });
+    if (!store.cleanup) return res.status(503).json({ error: 'Limpieza no disponible' });
+    const removed = await store.cleanup();
+    logger(JSON.stringify({ severity: 'INFO', event: 'scheduled_cleanup', removed }));
+    res.json({ status: 'ok', removed });
+  });
   app.post('/api/join', async (req, res) => {
     if (demoCode && req.body.code !== demoCode) fail(403, 'Código de clase incorrecto');
     const player = newPlayer(req.body.name); await store.create(player); await store.heartbeat(player, player);
@@ -74,16 +81,17 @@ function createApp({ store, secret, demoCode, logger = console.log }) {
     let database = 'error'; let asset = 'error';
     try { await store.health(); database = store.kind === 'firestore' ? (process.env.FIRESTORE_EMULATOR_HOST ? 'emulador local; no nube' : 'Firestore conectado; fuera del conteo académico') : store.kind === 'postgres' ? (process.env.K_SERVICE ? 'PostgreSQL conectado; verificar instancia Cloud SQL en consola' : 'PostgreSQL local conectado') : process.env.K_SERVICE ? 'memoria temporal en Cloud Run; se pierde al reiniciar; no cuenta como base de datos' : 'memoria local, no nube'; } catch {}
     try { assetCache = await loadAsset(); asset = assetCache.source; } catch {}
+    if (store.kind === 'realtime' && database !== 'error') database = 'Firebase Realtime Database conectado; fuera del conteo académico';
     res.json({ checkedAt: new Date().toISOString(), services: [
       { name: 'Cloud Run', status: process.env.K_SERVICE ? 'ejecutándose en Cloud Run' : 'servidor local' },
-      { name: store.kind === 'firestore' ? 'Firestore (no cuenta)' : store.kind === 'postgres' ? 'PostgreSQL' : 'Datos de práctica', status: database }, { name: 'Cloud Storage', status: asset },
+      { name: store.kind === 'realtime' ? 'Firebase Realtime Database (no cuenta)' : store.kind === 'firestore' ? 'Firestore (no cuenta)' : store.kind === 'postgres' ? 'PostgreSQL' : 'Datos de práctica', status: database }, { name: 'Cloud Storage', status: asset },
       { name: 'IAM', status: 'verificar roles y cuenta de servicio en consola' },
       { name: 'Secret Manager', status: process.env.K_SERVICE ? 'verificar referencia de secretos en revisión' : process.env.GQ_SECRET_SOURCE === 'gcloud-secret-manager' ? 'secretos cargados por el iniciador desde GCP; verificar versiones y permisos en consola' : 'clave local; sin evidencia de Secret Manager' },
       { name: 'Observability', status: 'logs JSON implementados; verificar recepción y panel en consola' },
-      { name: 'GitHub Actions', status: 'verificar ejecución de despliegue en GitHub' },
+      { name: 'Cloud Build', status: 'verificar construcción e imagen en historial de Cloud Build' },
+      { name: 'GitHub Actions (apoyo)', status: 'verificar validación del código en GitHub' },
       { name: 'Artifact Registry (apoyo)', status: 'verificar imagen y digest en consola' },
-      { name: 'Cloud Tasks', status: 'planificado: trabajos diferidos; todavía no integrado' },
-      { name: 'Cloud Scheduler', status: 'planificado: limpieza periódica; todavía no integrado' }
+      { name: 'Cloud Scheduler', status: store.cleanup && process.env.CLEANUP_SERVICE_ACCOUNT ? 'endpoint de limpieza protegido configurado; verificar ejecución del job en consola' : 'planificado: limpieza periódica; todavía no integrado' }
     ] });
   });
   app.get('/api/asset', async (req, res) => {

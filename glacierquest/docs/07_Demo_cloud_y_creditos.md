@@ -1,5 +1,8 @@
 # Demo en Google Cloud y protección del crédito
 
+> Esta página documenta la etapa inicial con memoria temporal. La demo actual ya
+> utiliza Firebase Realtime Database; consultar [Firebase y Scheduler](08_Firebase_y_Scheduler.md).
+
 Revisión: 2026-10-10. Proyecto autorizado: `glacier-quest-1791678996`.
 Cuenta: `angelcamargopro2005@gmail.com`. Facturación vinculada verificada:
 `019891-D38015-39EEC1`.
