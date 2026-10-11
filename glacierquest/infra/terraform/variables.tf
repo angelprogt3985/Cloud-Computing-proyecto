@@ -31,6 +31,11 @@ variable "github_repository_id" {
 variable "github_owner_id" {
   type = string
 }
+variable "github_branch" {
+  type        = string
+  default     = "codex/preentrega-iam-actions"
+  description = "Only this branch can run the cloud identity verification workflow."
+}
 
 variable "enable_database" {
   type    = bool

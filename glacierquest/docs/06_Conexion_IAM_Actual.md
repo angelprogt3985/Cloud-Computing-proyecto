@@ -1,44 +1,38 @@
-# Estado real y siguiente paso: IAM + Actions
+# Estado real: IAM + GitHub Actions
 
-Actualizado el 10 de octubre de 2026. Presupuesto objetivo del proyecto: US$20 en total, no los US$300 del crédito. El juego permanece sin desplegar; no se habilita acceso público.
+Actualizado el 10 de octubre de 2026. Rama de trabajo: `codex/preentrega-iam-actions`. El usuario confirmó una prueba gratuita con US$300; la captura aportada muestra 90 días. El crédito es saldo promocional, no un presupuesto que deba agotarse. Se mantiene la referencia de US$10 mensuales indicada en esta conversación. La configuración de identidad no modifica la modalidad de facturación.
 
-## Lo comprobado
+## Comprobado en Google Cloud
 
-- Proyecto: `glacier-quest-1791678996`, número `636305098699`.
-- Creadas `glacierquest-runtime` y `glacierquest-deploy`, ambas sin claves. No se les han asignado permisos de juego.
-- La sesión de Pablo tiene rol Editor; el propietario es Ángel. La consola deniega `iam.workloadIdentityPools.create` y `iam.workloadIdentityPoolProviders.create`, y no permite modificar IAM del proyecto.
-- GitHub Actions ejecutó correctamente pruebas del juego/HTTP en memoria, construcción Docker y validación de Terraform: https://github.com/angelprogt3985/Cloud-Computing-proyecto/actions/runs/38101380481 (commit b0f8672).
-- IDs comprobados en el resumen de esa ejecución: repositorio `1367518501`, propietario `162619282`.
-- Se eliminó el permiso `allUsers` del Terraform de Cloud Run y se redujo el máximo previsto de instancias a una. El mínimo sigue en cero, facturación por solicitudes. Son cambios de configuración, no un despliegue.
-- Se inició la habilitación de APIs de identidad desde la consola. La federación NO está creada ni probada.
+- Proyecto activo: `glacier-quest-1791678996`, número `636305098699`.
+- Se verificó acceso con la cuenta propietaria autorizada para este proyecto y facturación habilitada. La cuenta anterior no se utilizó para estas operaciones.
+- Se reutilizaron `glacierquest-runtime` y `glacierquest-deploy`. No se crearon claves JSON ni se concedieron roles del juego a estas identidades.
+- Se creó el pool `glacierquest-github` y el proveedor OIDC `github`, con emisor `https://token.actions.githubusercontent.com`.
+- La confianza exige simultáneamente el ID de repositorio `1367518501`, el ID de propietario `162619282`, la rama `refs/heads/codex/preentrega-iam-actions` y el workflow `.github/workflows/verify-cloud-identity.yml` de esa misma rama. Los IDs se comprobaron en el resumen de la ejecución de CI existente.
+- Se concedió `roles/iam.workloadIdentityUser` únicamente sobre `glacierquest-deploy` al conjunto de identidades de ese repositorio dentro del pool restringido. No se cambió el rol Editor del colaborador ni se le concedieron permisos de facturación.
+- No se ejecutó `terraform apply`, ni se crearon bases de datos, buckets, imágenes o servicios de juego. Cloud Run permanece sin acceso anónimo en Terraform.
 
-## Función útil de cada parte
+## Verificación en Actions
 
-IAM separa la identidad del servidor y la del proceso de entrega. La federación admitirá únicamente tokens del repositorio del equipo y de `main`, evitando claves JSON permanentes. No se otorga Owner/Editor a cuentas de servicio.
+Estado: pendiente de ejecutar el workflow actualizado en GitHub.
 
-Actions detecta cambios que rompen pruebas, empaquetado o Terraform. El workflow `verify-cloud-identity.yml` es manual y solicita un token temporal de cinco minutos; no lo imprime ni lo guarda como artefacto. Solo prueba autenticación, no permisos sobre recursos ni despliegue. Debe integrarse en `main` y configurarse la federación antes de ejecutarlo.
+El workflow `verify-cloud-identity.yml` pide un token de acceso de 300 segundos con `google-github-actions/auth@v3`. No imprime el token, no crea un archivo de credenciales y no publica artefactos. Un resultado exitoso demuestra autenticación como `glacierquest-deploy`, no despliegue ni permisos para usar datos del juego.
 
-Estas verificaciones no consumen crédito GCP por ejecución del juego. Usan minutos de GitHub, sujetos a la cuota de la cuenta propietaria del repositorio privado. Revisar esa cuota antes de pruebas numerosas. Actions todavía no acredita el requisito académico de desplegar a la nube: esa demostración queda pendiente.
+La comprobación se ejecuta al subir cambios al propio archivo del workflow en esta rama. Esto permite probar sin integrar la rama en `main`: GitHub exige que un workflow exista en la rama predeterminada para habilitar su ejecución manual mediante `workflow_dispatch`. Se conserva ese disparador para cuando corresponda, pero la condición del job y del proveedor sigue restringiendo la rama autorizada.
 
-## Paso del propietario, sin compartir su cuenta
+La CI independiente valida pruebas, Docker y Terraform. Usa minutos de GitHub, sujetos a la cuota del repositorio privado. Evidencia anterior: [CI exitosa de b0f8672](https://github.com/angelprogt3985/Cloud-Computing-proyecto/actions/runs/38101380481). Esa ejecución no verificó autenticación contra GCP.
 
-Ángel puede revisar y ejecutar `infra/bootstrap-identity.sh` en su propia sesión de Cloud Shell, dentro de este proyecto:
+## Repetición y cambios futuros
 
-```bash
-bash glacierquest/infra/bootstrap-identity.sh
-```
+`infra/bootstrap-identity.sh` contiene la configuración revisada y fija explícitamente la cuenta propietaria autorizada. Es un script de creación inicial, no un reconciliador: no volver a ejecutarlo sobre los recursos ya creados. Primero inspeccionar el pool, proveedor y permisos con comandos `describe` y `get-iam-policy`.
 
-Debe ejecutar la copia de este archivo correspondiente a la rama revisada. El script verifica el número de proyecto, reutiliza la cuenta deploy, habilita solo APIs IAM/credenciales/STS, crea el pool y proveedor, y concede `roles/iam.workloadIdentityUser` únicamente sobre la cuenta deploy al repositorio identificado. No concede permisos para bases, secretos, almacenamiento ni ejecución. No crea el juego ni modifica facturación. Se detiene ante errores; si queda incompleto, inspeccionar los recursos antes de repetirlo, porque no es un reconciliador de recursos existentes.
+Para admitir otra rama o un workflow de despliegue hay que revisar y actualizar la confianza deliberadamente. `main`, otras ramas y otros workflows no están autorizados por esta configuración. La cuenta deploy todavía requiere permisos específicos de recursos antes de poder desplegar el juego.
 
-No hace falta conceder acceso a Google Accounts, compartir contraseñas ni dar Owner a Pablo. Alternativamente, el propietario puede delegar los permisos administrativos estrictamente necesarios, pero eso requiere acordar una ampliación de acceso aparte.
+## Conciliar Terraform antes de otra fase
 
-Después: integrar la rama revisada en `main`, ejecutar manualmente **Verify Google Cloud identity (no deployment)** desde Actions y guardar su URL exitosa. No ejecutar Terraform apply general para resolver la federación.
+Terraform refleja la misma rama y workflow mediante `github_branch` y `github_repository`. El módulo general también crea registro de imágenes, bucket y secretos con `deploy_app=false`; no aplicarlo para verificar identidad.
 
-## Conciliar con Terraform antes de desplegar en otra fase
-
-El módulo general crea también registro de imágenes, bucket y secretos incluso con `deploy_app=false`; por eso NO es un módulo de identidad sin recursos facturables. No aplicarlo ahora.
-
-Las dos cuentas ya creadas y, después del bootstrap, la federación deben importarse al estado antes de planificar el módulo general. Ejemplos desde `glacierquest/infra/terraform`, con variables verificadas y un estado protegido:
+Antes de cualquier aplicación futura, importar las identidades creadas al estado protegido y revisar el plan. Desde `glacierquest/infra/terraform`, con las variables del proyecto verificadas:
 
 ```bash
 terraform import google_service_account.runtime projects/glacier-quest-1791678996/serviceAccounts/glacierquest-runtime@glacier-quest-1791678996.iam.gserviceaccount.com
@@ -47,14 +41,6 @@ terraform import google_iam_workload_identity_pool.github projects/glacier-quest
 terraform import google_iam_workload_identity_pool_provider.github projects/glacier-quest-1791678996/locations/global/workloadIdentityPools/glacierquest-github/providers/github
 ```
 
-Conciliar también el binding existente `google_service_account_iam_member.github` y revisar el plan antes de cualquier aplicación. No subir estados, tfvars ni credenciales al repositorio.
+Conciliar también el binding `google_service_account_iam_member.github`. No subir estados, tfvars ni credenciales. Los archivos anteriores del repositorio contienen propuestas de Firestore que contradicen la restricción indicada por el usuario; esta etapa de identidad no elige ni activa una base de datos.
 
-## Control de gasto para la siguiente fase
-
-No hay workflow de despliegue activado en esta rama. La verificación de identidad no ejecuta Terraform ni publica imágenes. Los permisos del servidor sobre datos y secretos se concederán solo cuando existan los recursos y se necesiten para una prueba.
-
-Antes de cada prueba real: identificar cargos posibles, duración y procedimiento de cierre. Al terminar: detener disparadores, retirar ejecución innecesaria y revisar almacenamiento residual. Escalar a cero no elimina cargos de otros servicios. Una alerta de presupuesto tampoco bloquea cargos automáticamente; el máximo de una instancia no es un tope de dinero.
-
-El acceso de la clase se acordará por separado, con identidades autorizadas. El Terraform no concede acceso anónimo. No se cambiaron las mecánicas del juego.
-
-Fuentes: https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines y https://github.com/google-github-actions/auth
+Fuentes: [Federación con pipelines](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines), [acción de autenticación](https://github.com/google-github-actions/auth), [ejecución manual en GitHub](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
