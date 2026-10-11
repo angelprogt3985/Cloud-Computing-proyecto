@@ -1,7 +1,7 @@
 project_id = "glacier-quest-1791678996"
 github_repository = "angelprogt3985/Cloud-Computing-proyecto"
-github_repository_id = "REPLACE_WITH_VERIFIED_NUMERIC_ID"
-github_owner_id = "REPLACE_WITH_VERIFIED_NUMERIC_ID"
+github_repository_id = "1367518501"
+github_owner_id = "162619282"
 region = "us-central1"
 deploy_app = false
 image = ""

@@ -1,5 +1,7 @@
 # Preentrega: IAM y GitHub Actions sin activar servicios facturables
 
+> Guía histórica: el proyecto correcto es `glacier-quest-1791678996`, ya tiene facturación y las cuentas de servicio ya existen. Para el estado comprobado, los límites de gasto y el siguiente paso usar [06_Conexion_IAM_Actual.md](06_Conexion_IAM_Actual.md). No repetir la creación de cuentas ni usar el ID antiguo de esta guía.
+
 ## QuÃ© cuenta y quÃ© no
 
 La rÃºbrica permite IAM cuando hay roles/polÃ­ticas, cuentas o identidades propios configurados y documentados. GitHub Actions se admite cuando despliega a la nube. Un workflow que solo prueba y construye es avance de CI, todavÃ­a no CI/CD integrado a efectos del conteo. No presentar esta fase como dos servicios cloud desplegados. El requisito formal de M2 sigue pendiente si exige dos servicios desplegados.
