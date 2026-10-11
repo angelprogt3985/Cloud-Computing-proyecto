@@ -1,4 +1,4 @@
-> Estado vigente: [IAM y Actions](docs/06_Conexion_IAM_Actual.md). Proyecto: `glacier-quest-1791678996`. Federación creada para `codex/preentrega-iam-actions`; verificación en Actions pendiente. Sin despliegue del juego.
+> Estado vigente: [IAM y Actions](docs/06_Conexion_IAM_Actual.md). Proyecto: `glacier-quest-1791678996`. Federación y autenticación verificadas desde `codex/preentrega-iam-actions`; CI aprobada. Sin despliegue del juego.
 
 # Glacier Quest 0.3 - Preentrega
 

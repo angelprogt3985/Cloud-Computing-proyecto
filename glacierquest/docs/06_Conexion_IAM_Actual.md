@@ -14,7 +14,11 @@ Actualizado el 10 de octubre de 2026. Rama de trabajo: `codex/preentrega-iam-act
 
 ## Verificación en Actions
 
-Estado: pendiente de ejecutar el workflow actualizado en GitHub.
+Estado: autenticación verificada correctamente en GitHub para el commit `f4a1756fce45af67e14514855b9b0c10d4066295`.
+
+- [Verificación IAM exitosa](https://github.com/angelprogt3985/Cloud-Computing-proyecto/actions/runs/38103854018): intercambio OIDC por token temporal de `glacierquest-deploy`, sin despliegue.
+- [CI exitosa del mismo commit](https://github.com/angelprogt3985/Cloud-Computing-proyecto/actions/runs/38103853934): pruebas HTTP/juego en memoria y caché, construcción Docker y validación de Terraform.
+- Comprobaciones locales: sintaxis Bash, YAML, `terraform fmt -check`, `terraform validate` y `git diff --check` correctos. No se ejecutaron pruebas de una base real.
 
 El workflow `verify-cloud-identity.yml` pide un token de acceso de 300 segundos con `google-github-actions/auth@v3`. No imprime el token, no crea un archivo de credenciales y no publica artefactos. Un resultado exitoso demuestra autenticación como `glacierquest-deploy`, no despliegue ni permisos para usar datos del juego.
 
