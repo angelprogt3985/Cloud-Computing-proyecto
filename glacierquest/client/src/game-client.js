@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
 let token = sessionStorage.getItem('gq-session'), player, target, npc = { x: 520, y: 160, name: 'Guardián' }, items = [], remotes = [], collecting = new Set(), busy = false, running = false;
 const POLL_MS = 5000;
+fetch('/health').then(r => r.json()).then(d => { $('demo-warning').hidden = !d.ephemeral; }).catch(() => {});
 async function api(path, body) {
   const r = await fetch('/api/' + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(12000) });
   const data = await r.json(); if (!r.ok) { const e = new Error(data.error || 'Error del servidor'); e.status = r.status; throw e; } return data;

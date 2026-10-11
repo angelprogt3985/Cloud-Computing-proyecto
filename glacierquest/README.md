@@ -1,8 +1,8 @@
-> Estado vigente: [IAM y Actions](docs/06_Conexion_IAM_Actual.md). Proyecto: `glacier-quest-1791678996`. Federación y autenticación verificadas desde `codex/preentrega-iam-actions`; CI aprobada. Sin despliegue del juego.
+> Estado vigente: [Demo real y crédito de prueba](docs/07_Demo_cloud_y_creditos.md). Cloud Run privado + Cloud Storage + Secret Manager desplegados en `glacier-quest-1791678996`. Para abrir el juego: `./start-cloud-demo.ps1`. Progreso temporal; base de datos pendiente. [Etapa anterior: IAM y Actions](docs/06_Conexion_IAM_Actual.md).
 
 # Glacier Quest 0.3 - Preentrega
 
-**Inicio vigente:** [Conectar servicios desde cero](docs/04_Conexion_paso_a_paso.md). Primer paso: IAM + Storage + Secret Manager con servidor local mediante start-cloud-local.ps1. Cloud Tasks y Scheduler sustituyen el plan anterior de Pub/Sub, todav�a pendientes. El juego no cambi� en esta revisi�n.
+**Inicio vigente:** [Demo cloud y credito de prueba](docs/07_Demo_cloud_y_creditos.md). Los documentos 04/05 conservan planes anteriores. La base de datos y los demas servicios siguen pendientes.
 
 Proyecto de Cloud Computing. Esta entrega prioriza los servicios y sus etapas de integración. No utiliza Firestore. La base prevista es PostgreSQL en Cloud SQL.
 

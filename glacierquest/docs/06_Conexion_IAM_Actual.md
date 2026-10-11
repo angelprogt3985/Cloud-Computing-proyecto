@@ -1,5 +1,7 @@
 # Estado real: IAM + GitHub Actions
 
+> Registro histórico de la etapa de identidad. La demo posterior y los permisos de sus recursos están documentados en [07: Demo cloud y créditos](07_Demo_cloud_y_creditos.md).
+
 Actualizado el 10 de octubre de 2026. Rama de trabajo: `codex/preentrega-iam-actions`. El usuario confirmó una prueba gratuita con US$300; la captura aportada muestra 90 días. El crédito es saldo promocional, no un presupuesto que deba agotarse. Se mantiene la referencia de US$10 mensuales indicada en esta conversación. La configuración de identidad no modifica la modalidad de facturación.
 
 ## Comprobado en Google Cloud

@@ -15,7 +15,7 @@ class MemoryStore {
 function createStore(kind) {
   if (kind === 'firestore') return new (require('./firestore').FirestoreStore)();
   if (kind === 'postgres') return new (require('./postgres').PostgresStore)();
-  if (kind === 'memory' && process.env.NODE_ENV !== 'production') return new MemoryStore();
-  throw new Error('Invalid STORE; memory is local-only');
+  if (kind === 'memory' && (process.env.NODE_ENV !== 'production' || process.env.GQ_DEMO_MODE === 'true')) return new MemoryStore();
+  throw new Error('Invalid STORE; memory requires local development or explicit demo mode');
 }
 module.exports = { MemoryStore, createStore };
