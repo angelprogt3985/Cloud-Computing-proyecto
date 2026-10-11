@@ -1,5 +1,9 @@
 # Opens a local authenticated tunnel; the game itself runs in Google Cloud.
 $ErrorActionPreference = 'Stop'
+if (-not $env:CLOUDSDK_PYTHON) {
+  $availablePython = Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe'
+  if (Test-Path -LiteralPath $availablePython) { $env:CLOUDSDK_PYTHON = $availablePython }
+}
 $common = @('--configuration=glacierquest-creditos', '--account=angelcamargopro2005@gmail.com', '--project=glacier-quest-1791678996')
 Write-Host 'Codigo de clase de esta demo privada (no lo publiques):'
 & gcloud secrets versions access 1 --secret=glacierquest-demo-code @common
