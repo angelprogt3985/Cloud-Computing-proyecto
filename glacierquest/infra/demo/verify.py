@@ -1,4 +1,4 @@
-"""Exercise the private cloud demo without printing Google tokens or secret values."""
+"""Exercise the public demo and class-code gate without printing secrets."""
 import json
 import subprocess
 import urllib.error
@@ -15,13 +15,10 @@ def gcloud(*args):
 
 service = json.loads(gcloud('run', 'services', 'describe', 'glacierquest-demo', '--region=us-central1', '--format=json'))
 base = service['status']['url']
-identity = gcloud('auth', 'print-identity-token')
 code = gcloud('secrets', 'versions', 'access', '1', '--secret=glacierquest-demo-code')
 
-def call(path, body=None, session=None, authenticated=True):
+def call(path, body=None, session=None):
     headers = {'Content-Type': 'application/json'}
-    if authenticated:
-        headers['X-Serverless-Authorization'] = 'Bearer ' + identity
     if session:
         headers['Authorization'] = 'Bearer ' + session
     req = urllib.request.Request(base + path, headers=headers, data=None if body is None else json.dumps(body).encode())
@@ -32,7 +29,10 @@ def call(path, body=None, session=None, authenticated=True):
     except urllib.error.HTTPError as error:
         return error.code, error.headers, None
 
-assert call('/health', authenticated=False)[0] in (401, 403), 'Service is publicly callable'
+assert call('/')[0] == 200, 'Public landing page unavailable'
+for path in ['/api/me', '/api/services', '/api/asset']:
+    assert call(path)[0] == 401, 'Game endpoint must require a session'
+assert call('/api/join', {'name': 'Missing code'})[0] == 403
 status, _, health = call('/health')
 assert status == 200 and health['cloud'] and health['demo'] and health['ephemeral']
 assert call('/api/join', {'name': 'Wrong code', 'code': 'incorrect-code'})[0] == 403
@@ -57,4 +57,4 @@ assert secret_refs['SESSION_SECRET']['name'] == 'glacierquest-demo-session'
 assert secret_refs['DEMO_CODE']['name'] == 'glacierquest-demo-code'
 assert all(secret_refs[k]['key'] == '1' for k in ['SESSION_SECRET', 'DEMO_CODE'])
 assert service['spec']['template']['spec']['serviceAccountName'] == 'glacierquest-runtime@' + PROJECT + '.iam.gserviceaccount.com'
-print(json.dumps({'status': 'PASS', 'url': base, 'revision': service['status']['latestReadyRevisionName'], 'checks': ['private access', 'cloud health', 'secret references', 'wrong code rejected', 'two players', 'Storage asset', 'chat', 'presence']}, indent=2))
+print(json.dumps({'status': 'PASS', 'url': base, 'revision': service['status']['latestReadyRevisionName'], 'checks': ['public page without Google credentials', 'game endpoints require session', 'missing and wrong code rejected', 'cloud health', 'secret references', 'two players', 'Storage asset', 'chat', 'presence']}, indent=2))

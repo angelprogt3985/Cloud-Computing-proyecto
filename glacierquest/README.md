@@ -1,4 +1,4 @@
-> Estado vigente: [Demo real y crédito de prueba](docs/07_Demo_cloud_y_creditos.md). Cloud Run privado + Cloud Storage + Secret Manager desplegados en `glacier-quest-1791678996`. Para abrir el juego: `./start-cloud-demo.ps1`. Progreso temporal; base de datos pendiente. [Etapa anterior: IAM y Actions](docs/06_Conexion_IAM_Actual.md).
+> Estado vigente: [Demo real y crédito de prueba](docs/07_Demo_cloud_y_creditos.md). Cloud Run con enlace público y código de clase + Cloud Storage + Secret Manager desplegados en `glacier-quest-1791678996`. [Abrir el juego](https://glacierquest-demo-636305098699.us-central1.run.app). Usa el código de clase; no necesitas localhost. Progreso temporal; base de datos pendiente. [Etapa anterior: IAM y Actions](docs/06_Conexion_IAM_Actual.md).
 
 # Glacier Quest 0.3 - Preentrega
 

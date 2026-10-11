@@ -39,7 +39,7 @@ el consumo elegible que las exceda utiliza el crédito disponible.
 
 | Servicio | Uso real comprobado | Configuración aplicada |
 | --- | --- | --- |
-| Cloud Run | Ejecutar API y cliente del juego | Servicio privado `glacierquest-demo`, región `us-central1`, CPU por solicitudes, 512 MiB, mínimo 0, máximo 1 instancia |
+| Cloud Run | Ejecutar API y cliente del juego | Servicio público con código de clase `glacierquest-demo`, región `us-central1`, CPU por solicitudes, 512 MiB, mínimo 0, máximo 1 instancia |
 | Cloud Storage | Servir `glacier-banner.svg` mediante la API del juego | Bucket regional privado, acceso uniforme y prevención de acceso público; lectura para la identidad de ejecución |
 | Secret Manager | Proporcionar `SESSION_SECRET` y `DEMO_CODE` a Cloud Run | Dos secretos, versiones explícitas y acceso limitado a la identidad de ejecución |
 
@@ -56,7 +56,7 @@ con eliminación de fuentes `source/` al cumplir un día. Soft delete desactivad
 ambos buckets de demo. Repositorio Docker: `glacierquest-demo` en `us-central1`.
 Secretos: `glacierquest-demo-session` y `glacierquest-demo-code`, versiones 1.
 
-Cloud Run exige IAM y no tiene `allUsers`. Máximo configurado 1 tanto por servicio
+Acceso público autorizado por el usuario: `allUsers` tiene `roles/run.invoker` únicamente sobre esta demo. El juego exige código de clase para crear una sesión; Storage y secretos permanecen privados. Máximo configurado 1 tanto por servicio
 como por revisión; CPU por solicitudes, sin startup CPU boost, concurrencia 40 y
 timeout 30 segundos. Cloud Build tiene timeout de 10 minutos y no tiene trigger.
 
@@ -79,22 +79,25 @@ consumo por sí mismas.
 - `.gcloudignore` limita la subida a fuentes de aplicación y dependencias fijadas.
 - `cloudbuild.demo.yaml` construye la imagen, sin disparador automático ni despliegue.
 - Las 12 pruebas locales pasan. `infra/demo/verify.py` pasó contra Google Cloud:
-  acceso privado, salud en nube, referencias de secretos versión 1, código incorrecto
+  acceso público, endpoints del juego protegidos por sesión, salud en nube, referencias de secretos versión 1, código incorrecto
   rechazado, dos jugadores, recurso de Storage, chat y presencia.
 
-## Abrir la demo privada
+## Abrir y compartir la demo
 
-En PowerShell, desde `glacierquest`, con gcloud y la configuración
-`glacierquest-creditos` autenticada con la cuenta autorizada:
+Abre [Glacier Quest](https://glacierquest-demo-636305098699.us-central1.run.app)
+y escribe tu nombre y el código de clase. Comparte el enlace y el código solo con
+los compañeros que deban jugar. No hace falta cuenta de Google, PowerShell ni
+localhost para entrar. La computadora del propietario puede estar apagada.
 
-```powershell
-.\start-cloud-demo.ps1
-```
+El código está en Secret Manager (`glacierquest-demo-code`, versión 1); no debe
+incluirse en el repositorio. El acceso público no cambia la modalidad de facturación.
+El máximo de una instancia y las alertas de US$10 permanecen configurados.
+Las solicitudes ajenas también pueden consumir recursos, aunque no conozcan el
+código. El código no equivale a protección contra ataques o a un tope de gasto.
 
-El script muestra el código de clase en tu terminal y abre el proxy autenticado.
-Abre **http://localhost:8085** e introduce tu nombre y ese código. El juego corre
-en Google Cloud; localhost es solo el túnel. Cierra la terminal para detenerlo.
-La URL directa sin credenciales da 403, como corresponde a un servicio privado.
+`start-cloud-demo.ps1` se conserva como herramienta opcional de acceso autenticado;
+no es necesario para utilizar el enlace público. La verificación de la demo ahora
+prueba la portada sin credenciales de Google y rechaza sesiones sin código válido.
 
 ## Evidencia
 
