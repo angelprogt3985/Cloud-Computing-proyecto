@@ -1,8 +1,10 @@
-> Estado vigente: [Firebase y Scheduler](docs/08_Firebase_y_Scheduler.md). Cloud Run con enlace público y código de clase + Cloud Storage + Secret Manager + Firebase Realtime Database desplegados en `glacier-quest-1791678996`. [Abrir el juego](https://glacierquest-demo-636305098699.us-central1.run.app). Usa el código de clase; no necesitas localhost. El progreso se guarda en Firebase. [Etapa anterior: demo y créditos](docs/07_Demo_cloud_y_creditos.md).
+> Presentaciones separadas: [Preentrega: IAM y GitHub Actions](docs/entregas/preentrega.md) · [Entrega final: integraciones y pendientes](docs/entregas/entrega-final.md) · [Índice y referencias históricas](docs/entregas/README.md).
 
-# Glacier Quest 0.3 - Preentrega
+# Glacier Quest — Proyecto y entregas
 
-**Inicio vigente:** [Nueva base y servicio sustituto: Firebase + Scheduler](docs/08_Firebase_y_Scheduler.md). Los documentos 01–07 conservan las etapas anteriores.
+La preentrega se centra en IAM y CI con evidencias verificadas. El código actual conserva los avances cloud de la etapa final; esta separación no revierte integraciones ni cambia sus fechas. La rama conserva su nombre porque la federación de identidad depende de él.
+
+**Estado técnico ampliado:** [Firebase y Scheduler](docs/08_Firebase_y_Scheduler.md). La demo cloud existente se documenta en la entrega final; no es necesario abrirla para presentar IAM y Actions. Los documentos 01–08 y PDF anteriores son antecedentes de etapas concretas.
 
 Proyecto de Cloud Computing. La base integrada ahora es Firebase Realtime Database, autorizada por el docente fuera del conteo de siete servicios. Cloud Scheduler sustituye el lugar de Cloud SQL en ese conteo. La demo publicada guarda el progreso en Firebase; la integración y sus verificaciones se detallan en el documento 08.
 
