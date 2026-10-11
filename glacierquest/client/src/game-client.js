@@ -1,7 +1,16 @@
+import { mergeMessages } from './chat-state.mjs';
 const $ = id => document.getElementById(id);
 const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
 let token = sessionStorage.getItem('gq-session'), player, target, npc = { x: 520, y: 160, name: 'Guardián' }, items = [], remotes = [], collecting = new Set(), busy = false, running = false;
-const POLL_MS = 5000;
+const POLL_MS = 1500;
+let messages = [];
+function showMessages(incoming) {
+  const next = mergeMessages(messages, incoming);
+  if (next.length === messages.length && next.every((message, i) => message.id === messages[i].id)) return;
+  messages = next; $('chat-list').replaceChildren();
+  for (const m of messages) { const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = m.player_name + ': '; p.append(b, document.createTextNode(m.body)); $('chat-list').append(p); }
+  $('chat-list').scrollTop = $('chat-list').scrollHeight;
+}
 fetch('/health').then(r => r.json()).then(d => { $('demo-warning').hidden = !d.ephemeral; }).catch(() => {});
 async function api(path, body) {
   const r = await fetch('/api/' + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(12000) });
@@ -51,16 +60,16 @@ async function sync() {
     if (player && !document.hidden) {
       const d = await api('sync', { x: player.x, y: player.y });
       remotes = d.players.filter(p => p.id !== player.id).map(p => { const prev = remotes.find(r => r.id === p.id); return { ...p, drawX: prev?.drawX ?? p.x, drawY: prev?.drawY ?? p.y }; });
-      npc = d.npc; items = d.items; $('online').textContent = `${d.players.length} en la plaza · sincronización 5 s`;
-      $('connection').textContent = 'Conectado'; $('chat-list').replaceChildren();
-      for (const m of d.messages) { const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = m.player_name + ': '; p.append(b, document.createTextNode(m.body)); $('chat-list').append(p); }
+      npc = d.npc; items = d.items; $('online').textContent = `${d.players.length} en la plaza`;
+      $('connection').textContent = 'Conectado'; showMessages(d.messages);
     }
   } catch(e) { $('connection').textContent = 'Reconectando…'; error(e); }
   finally { setTimeout(sync, POLL_MS); }
 }
 $('chat-form').addEventListener('submit', async e => {
   e.preventDefault(); const body = $('chat-input').value.trim(); if (!body) return;
-  try { await api('chat', { body }); $('chat-input').value = ''; $('notice').textContent = 'Mensaje enviado'; } catch(e) { error(e); }
+  const btn = e.currentTarget.querySelector('button'); btn.disabled = true;
+  try { const d = await api('chat', { body }); showMessages([d.message]); if ($('chat-input').value.trim() === body) $('chat-input').value = ''; $('notice').textContent = 'Mensaje enviado'; } catch(e) { error(e); } finally { btn.disabled = false; }
 });
 $('refresh-services').addEventListener('click', inspectServices);
 canvas.addEventListener('pointerdown', e => {
@@ -116,7 +125,7 @@ function draw(dt) {
   for (const i of items) if (!player?.collected.includes(i.id)) {ctx.fillStyle=i.type==='coin'?'#e9aa37':'#378f83';ctx.beginPath();ctx.ellipse(i.x,i.y,9,i.type==='coin'?9:5,0,0,Math.PI*2);ctx.fill();}
   if(target) {ctx.strokeStyle='#238796';ctx.beginPath();ctx.arc(target.x,target.y,9,0,Math.PI*2);ctx.stroke();}
   penguin(npc.x,npc.y,'#725b9b','Guardián');
-  for(const p of remotes) {p.drawX+=(p.x-p.drawX)*Math.min(1,dt*3);p.drawY+=(p.y-p.drawY)*Math.min(1,dt*3);penguin(p.drawX,p.drawY,'#ca8451',p.name);}
+  for(const p of remotes) {p.drawX+=(p.x-p.drawX)*Math.min(1,dt*8);p.drawY+=(p.y-p.drawY)*Math.min(1,dt*8);penguin(p.drawX,p.drawY,'#ca8451',p.name);}
   if(player) penguin(player.x,player.y,'#237a95',player.name);
 }
 if (token) api('me').then(d=>{player=d.player;begin();}).catch(e=>{token=null;sessionStorage.removeItem('gq-session');$('join-error').textContent=e.message;});

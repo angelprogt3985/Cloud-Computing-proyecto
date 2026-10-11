@@ -50,7 +50,7 @@ class RealtimeStore {
     await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, x: position.x, y: position.y, seenAt: this.now() } });
   }
   async room() {
-    if (this.roomCache && this.now() - this.roomCache.at < 2000) return structuredClone(this.roomCache.value);
+    if (this.roomCache && this.now() - this.roomCache.at < 500) return structuredClone(this.roomCache.value);
     if (!this.roomPending) {
       this.roomPending = Promise.all([
         this.request('gq_presence', { query: { orderBy: 'seenAt', startAt: this.now() - 30000, limitToLast: 40 } }),

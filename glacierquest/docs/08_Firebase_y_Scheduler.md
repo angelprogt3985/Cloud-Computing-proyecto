@@ -9,10 +9,10 @@ usar Cloud SQL ni depender de la aprobación anterior de Firestore.
 - Proyecto `glacier-quest-1791678996`, cuenta `angelcamargopro2005@gmail.com`.
 - Firebase activado después de que el propietario aceptara los términos con esa cuenta.
 - Instancia activa `glacier-quest-1791678996-demo`, región `us-central1`.
-- Cloud Run usa `STORE=realtime`, revisión `glacierquest-demo-00002-hfh`.
-- Build exitoso `6ed36359-778a-4408-ab87-b5c21e0d31f7`.
-- Imagen `sha256:239afd4fd55b58e1b3804c1751c56448ad2a876e2717814150d851582ec9c841`.
-- 19 pruebas locales pasan. La prueba real comprobó jugadores, chat, presencia,
+- Cloud Run usa `STORE=realtime`, revisión `glacierquest-demo-00003-p8q`.
+- Build exitoso `0925a305-83e3-457f-9b9f-1eecea2fdb50`.
+- Imagen `sha256:ae5c41d2e74c934e0547689ab8cb0c1e13a1ecd6ea8824bbf0317ca76716f026`.
+- 21 pruebas locales pasan. La prueba real comprobó jugadores, chat, presencia,
   Storage y monedas persistidas mediante una lectura independiente de Firebase.
   Lectura anónima de la base y limpieza sin autorización: rechazadas.
 - Job `glacierquest-cleanup` creado y ejecutado con éxito. La prueba real de OIDC
@@ -71,9 +71,16 @@ invocación de Scheduler; no recibe permisos de base de datos.
 El adaptador almacena jugadores, inventario, combate, chat y presencia. Las
 mutaciones usan ETag y escrituras condicionales; si dos peticiones compiten por el
 mismo turno, se valida otra vez el estado para impedir premios duplicados.
-Las lecturas de sala se limitan a 40 presencias y 30 mensajes, con caché de 2 segundos.
-El cliente conserva por ahora su sincronización cada 5 segundos: usar Realtime
+Las lecturas de sala se limitan a 40 presencias y 30 mensajes, con caché de 500 ms.
+El cliente consulta cada 1,5 segundos después de terminar la petición anterior;
+pausa las solicitudes con la pestaña oculta. Los mensajes propios aparecen cuando
+el servidor confirma su guardado, sin esperar la siguiente consulta. Una respuesta
+antigua de sala no elimina ni duplica el mensaje recién enviado. Usar Realtime
 Database no transforma automáticamente el cliente en un sistema de WebSockets.
+El intervalo se redujo desde 5 segundos porque producía retrasos visibles entre
+jugadores. Esto puede generar aproximadamente 3,3 veces más consultas mientras
+se juega (sin contar la duración de cada petición); se conservan máximo una
+instancia de Cloud Run y mínimo cero. No implica gratuidad ilimitada.
 
 Scheduler invoca `/internal/cleanup` con un token OIDC firmado por Google y una
 identidad dedicada. La API comprueba destinatario, firma y correo verificado; una

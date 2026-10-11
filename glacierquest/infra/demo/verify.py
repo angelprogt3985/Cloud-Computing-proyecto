@@ -51,10 +51,17 @@ status, headers, asset = call('/api/asset', session=session)
 assert status == 200 and headers['X-Asset-Source'] == 'Google Cloud Storage' and b'<svg' in asset
 status, _, _ = call('/api/chat', {'body': 'Prueba de integracion cloud'}, session=session)
 assert status == 201
-time.sleep(2.1)  # Room cache is bounded to two seconds.
+time.sleep(0.6)  # Room cache is bounded to half a second.
 status, _, room = call('/api/sync', {'x': 320, 'y': 340}, session=second['token'])
 assert status == 200 and any(p['id'] == first['player']['id'] for p in room['players'])
 assert any(m['body'] == 'Prueba de integracion cloud' for m in room['messages'])
+status, _, _ = call('/api/sync', {'x': 240, 'y': 180}, session=session)
+assert status == 200
+time.sleep(0.6)
+status, _, updated_room = call('/api/sync', {'x': 320, 'y': 340}, session=second['token'])
+assert status == 200
+remote = next(p for p in updated_room['players'] if p['id'] == first['player']['id'])
+assert remote['x'] == 240 and remote['y'] == 180, 'Friend position remained stale'
 container = service['spec']['template']['spec']['containers'][0]
 secret_refs = {e['name']: e.get('valueFrom', {}).get('secretKeyRef') for e in container['env']}
 assert secret_refs['SESSION_SECRET']['name'] == 'glacierquest-demo-session'
