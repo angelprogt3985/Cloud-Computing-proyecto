@@ -1,0 +1,9 @@
+# Build only; deployment is a separate, explicit step. No automatic trigger.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', '${_IMAGE}', '.']
+images: ['${_IMAGE}']
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/glacierquest-build@$PROJECT_ID.iam.gserviceaccount.com
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 600s

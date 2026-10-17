@@ -1,8 +1,18 @@
-# Glacier Quest 0.3 - Preentrega
+> Actualización local del 17 de octubre: [chat temporal, ficha y armario](docs/13_Cambios_y_siguiente_paso.md). No desplegada. [Auditoría y límites de verificación](docs/12_Servicios_y_alcance_2026-10-17.md).
 
-**Inicio vigente:** [Conectar servicios desde cero](docs/04_Conexion_paso_a_paso.md). Primer paso: IAM + Storage + Secret Manager con servidor local mediante start-cloud-local.ps1. Cloud Tasks y Scheduler sustituyen el plan anterior de Pub/Sub, todav�a pendientes. El juego no cambi� en esta revisi�n.
+> Evidencia histórica: [Verificación funcional de los siete servicios y panel de Monitoring](docs/11_Verificacion_de_los_7_servicios.md).
 
-Proyecto de Cloud Computing. Esta entrega prioriza los servicios y sus etapas de integración. No utiliza Firestore. La base prevista es PostgreSQL en Cloud SQL.
+> Interfaz actual: [Pantalla completa, portada Jugar y menús flotantes](docs/10_Pantalla_completa.md).
+
+> Actualización del juego: [Expedición Boreal, cuentas y progreso](docs/09_Expedicion_y_cuentas.md). Crea tu cuenta con correo y código de clase para recuperar tu personaje.
+
+> Infraestructura: [Firebase y Scheduler](docs/08_Firebase_y_Scheduler.md). Cloud Run con enlace público y código de clase + Cloud Storage + Secret Manager + Firebase Realtime Database desplegados en `glacier-quest-1791678996`. [Abrir el juego](https://glacierquest-demo-636305098699.us-central1.run.app). Usa el código de clase; no necesitas localhost. El progreso se guarda en Firebase. [Etapa anterior: demo y créditos](docs/07_Demo_cloud_y_creditos.md).
+
+# Glacier Quest — Expedición Boreal
+
+**Inicio vigente:** [Nueva base y servicio sustituto: Firebase + Scheduler](docs/08_Firebase_y_Scheduler.md). Los documentos 01–07 conservan las etapas anteriores.
+
+Proyecto de Cloud Computing. La base integrada ahora es Firebase Realtime Database, autorizada por el docente fuera del conteo de siete servicios. Cloud Scheduler sustituye el lugar de Cloud SQL en ese conteo. La demo publicada guarda el progreso en Firebase; la integración y sus verificaciones se detallan en el documento 08.
 
 ## Abrir la demo local
 
@@ -19,7 +29,7 @@ Si 8080 está ocupado, cerrar el servidor anterior o usar `$env:PORT='8081'` y a
 
 ## Qué funciona
 
-Movimiento por clic/toque, chat, objetos recogibles, sesiones individuales y combate con ataque, defensa, curación, retirada y respuesta del enemigo. Panel que distingue servicios locales de comprobaciones de nube pendientes.
+Cuentas con correo, progreso persistente, niveles y experiencia, cinco zonas explorables, misiones, pesca, movimiento con teclado/clic, carrera, minimapa y chat. Combate contra el guardián y duelos consentidos entre jugadores, con ataque, defensa, curación y retirada. La información técnica se consulta desde el engranaje, sin ocupar el panel de juego. Ver controles y límites en el documento 09.
 
 ## Probar PostgreSQL local cuando corresponda
 
@@ -58,8 +68,8 @@ La prueba SQL se omite sin esa variable; requiere una base desechable de pruebas
 
 El ZIP conserva la estructura del repositorio: `.github/workflows` está en la raíz, junto a `glacierquest`. Descomprimir el ZIP completo; no copiar únicamente la carpeta interior si quieren usar Actions. El Dockerfile válido es `glacierquest/Dockerfile`.
 
-No se desplegó en GCP ni se contrataron servicios. La configuración no crea Cloud SQL ni Cloud Run por defecto. El requisito formal M2 de dos servicios desplegados sigue pendiente hasta que el equipo lo complete con su cuenta.
+La demo ya integra Cloud Run, Cloud Storage y Secret Manager, con IAM y Cloud Build para ejecutarla y desplegarla. No se ha creado Cloud SQL. Consultar los documentos 07 y 08 para separar recursos desplegados de trabajo pendiente.
 
 ## Alineación con laboratorios
 
-El plan de servicios fue ajustado a los labs compartidos por el equipo. Pub/Sub (lab 18) se incorpora al plan principal como etapa futura, todavía sin implementación. Secret Manager y Artifact Registry se conservan como apoyo, fuera del conteo de siete. El PDF de servicios distingue menciones explícitas de inferencias: los títulos Serverless/DevOps no confirman por sí solos Cloud Run/GitHub Actions. No se cambió el comportamiento del juego en esta revisión documental.
+Los PDFs conservan el plan anterior basado en los laboratorios. El plan actualizado de siete servicios está en el documento 08: Run, Storage, IAM, Secret Manager, Cloud Build, Logging + Monitoring y Scheduler. Firebase queda fuera del conteo; Artifact Registry apoya el despliegue. La aceptación académica depende de demostrar cada integración.

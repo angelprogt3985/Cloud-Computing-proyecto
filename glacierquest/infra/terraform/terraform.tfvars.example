@@ -1,7 +1,8 @@
-project_id = "YOUR_PROJECT_ID"
-github_repository = "OWNER/REPOSITORY"
-github_repository_id = "123456789"
-github_owner_id = "123456"
+project_id = "glacier-quest-1791678996"
+github_repository = "angelprogt3985/Cloud-Computing-proyecto"
+github_repository_id = "1367518501"
+github_owner_id = "162619282"
+github_branch = "codex/preentrega-iam-actions"
 region = "us-central1"
 deploy_app = false
 image = ""

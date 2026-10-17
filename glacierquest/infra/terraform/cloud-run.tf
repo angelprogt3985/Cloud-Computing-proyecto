@@ -6,7 +6,7 @@ resource "google_cloud_run_v2_service" "game" {
   ingress             = "INGRESS_TRAFFIC_ALL"
   scaling {
     min_instance_count = 0
-    max_instance_count = 2
+    max_instance_count = 1
   }
   template {
     service_account                  = google_service_account.runtime.email
@@ -14,7 +14,7 @@ resource "google_cloud_run_v2_service" "game" {
     max_instance_request_concurrency = 40
     scaling {
       min_instance_count = 0
-      max_instance_count = 2
+      max_instance_count = 1
     }
     containers {
       image = var.image
@@ -73,14 +73,8 @@ resource "google_cloud_run_v2_service" "game" {
   }
   depends_on = [google_project_service.apis, google_project_iam_member.firestore, google_firestore_database.game, google_secret_manager_secret_iam_member.session, google_secret_manager_secret_iam_member.demo, google_storage_bucket_iam_member.runtime]
 }
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  count    = var.deploy_app ? 1 : 0
-  project  = var.project_id
-  location = var.region
-  name     = google_cloud_run_v2_service.game[0].name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
-}
+# Private by default: no allUsers/allAuthenticatedUsers invoker binding.
+# Grant named classroom identities separately only when a demo is approved.
 resource "google_cloud_run_v2_service_iam_member" "deploy" {
   count    = var.deploy_app ? 1 : 0
   project  = var.project_id

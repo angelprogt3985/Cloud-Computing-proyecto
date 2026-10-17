@@ -1,0 +1,23 @@
+{
+  "checkedAt": "2026-10-16T19:34:15.581060+00:00",
+  "project": "glacier-quest-1791678996",
+  "checks": {
+    "Cloud Run": "PASS: public page, healthy API, persistent database and ready revision",
+    "Secret Manager": "PASS: two enabled versions referenced by Cloud Run; runtime access configured",
+    "Cloud Build": "PASS: successful build digest matches the deployed image; dedicated builder identity",
+    "Cloud Storage": "PASS: authenticated game asset matches the private bucket object; public read denied",
+    "IAM": "PASS: dedicated runtime without downloaded keys, scoped asset/secret access and rejected anonymous access",
+    "Logging + Monitoring": "PASS: structured logs from current revision and real data in all four dashboard charts",
+    "Cloud Scheduler": "PASS: enabled, OIDC configured and last reported status successful; run verify-scheduler.py for data effects"
+  },
+  "revision": "glacierquest-demo-00006-k72",
+  "build": "7d0447d8-a6cb-486b-8583-718e96febacf",
+  "metricPoints": {
+    "Solicitudes por segundo y respuesta HTTP": 226,
+    "Latencia p95 de las solicitudes": 31,
+    "Instancias activas e inactivas": 314,
+    "Utilizacion de memoria p95 (maximo por revision)": 120
+  },
+  "dashboard": "https://console.cloud.google.com/monitoring/dashboards/builder/f31ce3ca-de21-4b86-9fb6-5398625bc357?project=glacier-quest-1791678996",
+  "status": "PASS"
+}

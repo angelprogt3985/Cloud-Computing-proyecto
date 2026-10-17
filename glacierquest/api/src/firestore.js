@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const { fail } = require('./game');
+const { CHAT_TTL_MS, recentMessages, recentRoom } = require('./chat-policy');
 
 // Server SDK only: the browser never receives database credentials.
 class FirestoreStore {
@@ -34,7 +35,7 @@ class FirestoreStore {
     }
     const entry = { at: now };
     entry.pending = this.db.collection('gq_presence').doc(p.id).set({
-      id: p.id, name: p.name, x: pos.x, y: pos.y, seenAt: now
+      id: p.id, name: p.name, level: p.level || 1, avatar: p.avatar || null, x: pos.x, y: pos.y, seenAt: now
     });
     this.presenceWrites.set(p.id, entry);
     try { await entry.pending; entry.pending = null; }
@@ -42,22 +43,23 @@ class FirestoreStore {
   }
   async room() {
     const now = this.now();
-    if (this.roomCache && now - this.roomCache.at < 10000) return structuredClone(this.roomCache.value);
+    if (this.roomCache && now - this.roomCache.at < 10000) return recentRoom(this.roomCache.value, now);
     if (!this.roomPending) {
       this.roomPending = Promise.all([
         this.db.collection('gq_presence').where('seenAt', '>', now - 30000).orderBy('seenAt', 'desc').limit(40).get(),
-        this.db.collection('gq_chat').orderBy('createdAt', 'desc').limit(30).get()
+        this.db.collection('gq_chat').where('createdAt', '>', now - CHAT_TTL_MS).orderBy('createdAt', 'desc').limit(30).get()
       ]).then(([people, chat]) => {
-        const value = { players: people.docs.map(d => d.data()), messages: chat.docs.map(d => d.data()).reverse() };
+        const value = { players: people.docs.map(d => d.data()), messages: recentMessages(chat.docs.map(d => d.data()), this.now()) };
         this.roomCache = { at: this.now(), value };
         return value;
       }).finally(() => { this.roomPending = null; });
     }
-    return structuredClone(await this.roomPending);
+    return recentRoom(await this.roomPending, this.now());
   }
   async chat(p, body) {
-    const m = { id: randomUUID(), player_name: p.name, body, createdAt: this.now() };
+    const m = { id: randomUUID(), player_id: p.id, player_name: p.name, body, createdAt: this.now() };
     await this.db.collection('gq_chat').doc(m.id).create(m);
+    this.roomCache = null;
     return m;
   }
   async health() { await this.players().limit(1).get(); return true; }

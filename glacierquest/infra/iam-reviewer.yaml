@@ -1,0 +1,11 @@
+title: Glacier Quest IAM Reviewer
+description: Read project IAM configuration for the class architecture review; cannot change permissions or create keys.
+stage: GA
+includedPermissions:
+  - resourcemanager.projects.get
+  - resourcemanager.projects.getIamPolicy
+  - iam.serviceAccounts.get
+  - iam.serviceAccounts.list
+  - iam.serviceAccounts.getIamPolicy
+  - iam.roles.get
+  - iam.roles.list

@@ -1,0 +1,8 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "gq_presence": { ".indexOn": ["seenAt"] },
+    "gq_chat": { ".indexOn": ["createdAt"] }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "displayName": "Glacier Quest - Operacion de la demo",
+  "gridLayout": {
+    "columns": 2,
+    "widgets": [
+      {
+        "title": "Solicitudes por segundo y respuesta HTTP",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"glacierquest-demo\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": [
+                      "metric.label.response_code_class"
+                    ]
+                  }
+                },
+                "unitOverride": "1/s"
+              },
+              "plotType": "LINE",
+              "minAlignmentPeriod": "60s"
+            }
+          ],
+          "timeshiftDuration": "0s",
+          "yAxis": {
+            "label": "1/s",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Latencia p95 de las solicitudes",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"glacierquest-demo\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_DELTA",
+                    "crossSeriesReducer": "REDUCE_PERCENTILE_95"
+                  }
+                },
+                "unitOverride": "ms"
+              },
+              "plotType": "LINE",
+              "minAlignmentPeriod": "60s"
+            }
+          ],
+          "timeshiftDuration": "0s",
+          "yAxis": {
+            "label": "ms",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Instancias activas e inactivas",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"glacierquest-demo\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_MAX",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": [
+                      "metric.label.state"
+                    ]
+                  }
+                },
+                "unitOverride": "1"
+              },
+              "plotType": "LINE",
+              "minAlignmentPeriod": "60s"
+            }
+          ],
+          "timeshiftDuration": "0s",
+          "yAxis": {
+            "label": "1",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Utilizacion de memoria p95 (maximo por revision)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"run.googleapis.com/container/memory/utilizations\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"glacierquest-demo\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_95",
+                    "crossSeriesReducer": "REDUCE_MAX"
+                  }
+                },
+                "unitOverride": "10^2.%"
+              },
+              "plotType": "LINE",
+              "minAlignmentPeriod": "60s"
+            }
+          ],
+          "timeshiftDuration": "0s",
+          "yAxis": {
+            "label": "10^2.%",
+            "scale": "LINEAR"
+          }
+        }
+      },
+      {
+        "title": "Ejecuciones de limpieza programada",
+        "logsPanel": {
+          "filter": "resource.type=\"cloud_scheduler_job\" AND resource.labels.job_id=\"glacierquest-cleanup\"",
+          "resourceNames": [
+            "projects/glacier-quest-1791678996"
+          ]
+        }
+      },
+      {
+        "title": "Errores del juego y limpiezas completadas",
+        "logsPanel": {
+          "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"glacierquest-demo\" AND (severity>=ERROR OR jsonPayload.event=\"scheduled_cleanup\")",
+          "resourceNames": [
+            "projects/glacier-quest-1791678996"
+          ]
+        }
+      }
+    ]
+  },
+  "labels": {
+    "glacierquest": "",
+    "demo": ""
+  }
+}

@@ -1,0 +1,6 @@
+title: Glacier Quest database data access
+description: Existing database data access; update also permits rules and enablement changes. No billing or instance creation/deletion.
+stage: GA
+includedPermissions:
+  - firebasedatabase.instances.get
+  - firebasedatabase.instances.update

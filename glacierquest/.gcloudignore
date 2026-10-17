@@ -1,0 +1,13 @@
+# Only application source and its pinned dependencies are uploaded for the build.
+**
+!Dockerfile
+!.dockerignore
+!api/
+!api/package.json
+!api/package-lock.json
+!api/src/
+!api/src/**
+!client/
+!client/**
+!assets/
+!assets/**
