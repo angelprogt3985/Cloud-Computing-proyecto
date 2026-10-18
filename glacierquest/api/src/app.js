@@ -109,15 +109,15 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     if(!own && !(await store.room()).players.some(p=>p.id===req.params.id)) fail(404,'Explorador no disponible');
     const p=expedition.normalize(await store.get(req.params.id));
     if(!p) fail(404,'Explorador no disponible');
-    res.json({profile:{id:p.id,name:p.name,level:p.level,hp:p.hp,maxHp:p.maxHp,xp:p.xp,coins:p.coins,fish:p.fish,avatar:wardrobe.appearance(p),...(own?{ownedCosmetics:p.ownedCosmetics||[]}: {})}});
+    res.json({profile:{id:p.id,name:p.name,level:p.level,avatar:wardrobe.appearance(p),...(own?{hp:p.hp,maxHp:p.maxHp,xp:p.xp,coins:p.coins,fish:p.fish,ownedCosmetics:p.ownedCosmetics||[]}: {})}});
   });
   app.post('/api/avatar',async(req,res)=>res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.customize(p,req.body)))}));
-  app.post('/api/shop/buy',async(req,res)=>res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.buy(p,req.body.itemId)))}));
+  app.post('/api/shop/buy',async(req,res)=>{const pos=coordinates(req.body.x,req.body.y);res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.purchaseAt(p,req.body.itemId,pos)))});});
   app.post('/api/sync', async (req, res) => {
     const pos = coordinates(req.body.x, req.body.y);
     const duel=await settleArena();
     const p = publicPlayer(await store.get(req.playerId)); if (!p) fail(401, 'Sesión no disponible');
-    await store.heartbeat(p, pos); const room = await store.room(); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince); res.json({ ...room, player:p,quests:expedition.quests(p), npc: NPC, items: ITEMS,world:expedition.WORLD,places:expedition.PLACES,arena:duel,serverTime:Date.now() });
+    await store.heartbeat(p, pos); const room = await store.room(); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince); res.json({ ...room, player:p,quests:expedition.quests(p), npc: NPC, items: ITEMS,world:expedition.WORLD,places:[...expedition.PLACES,wardrobe.catalog.shop],arena:duel,serverTime:Date.now() });
   });
   app.post('/api/chat', async (req, res) => {
     const body = req.body.body;

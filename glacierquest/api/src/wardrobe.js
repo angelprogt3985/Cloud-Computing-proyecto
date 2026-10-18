@@ -1,6 +1,7 @@
 const { fail } = require('./game');
 
 const catalog = Object.freeze({
+  shop: Object.freeze({ id: 'shop', name: 'Tienda Boreal', x: 390, y: 310, kind: 'shop', radius: 70, hint: 'Entra a la tienda de accesorios' }),
   colors: Object.freeze([
     { id: 'blue', name: 'Turquesa', color: '#36b5d8' },
     { id: 'purple', name: 'Lila', color: '#a78bfa' },
@@ -8,9 +9,9 @@ const catalog = Object.freeze({
     { id: 'pink', name: 'Rosa', color: '#f472b6' },
   ].map(Object.freeze)),
   accessories: Object.freeze([
-    { id: 'hat', name: 'Gorro explorador', price: 6 },
-    { id: 'scarf', name: 'Bufanda polar', price: 9 },
-    { id: 'glasses', name: 'Gafas de nieve', price: 12 },
+    { id: 'hat', name: 'Gorro explorador', price: 6, hp: 0, attack: 0 },
+    { id: 'scarf', name: 'Bufanda polar', price: 9, hp: 4, attack: -1 },
+    { id: 'glasses', name: 'Gafas de nieve', price: 12, hp: -4, attack: 1 },
   ].map(Object.freeze)),
 });
 
@@ -61,4 +62,13 @@ function buy(player, itemId) {
   return player;
 }
 
-module.exports = { catalog, appearance, customize, buy };
+function duelLoadout(player) {
+  const avatar = appearance(player), gear = item(avatar.accessory);
+  return { avatar, maxHp: 40 + (gear?.hp || 0), attack: 10 + (gear?.attack || 0) };
+}
+function purchaseAt(player, itemId, pos) {
+  if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || Math.hypot(pos.x-catalog.shop.x,pos.y-catalog.shop.y)>catalog.shop.radius) fail(409,'Acércate a la Tienda Boreal');
+  if (player.battle?.status === 'active') fail(409,'Termina el combate antes de comprar');
+  return buy(player, itemId);
+}
+module.exports = { catalog, appearance, customize, buy, duelLoadout, purchaseAt };

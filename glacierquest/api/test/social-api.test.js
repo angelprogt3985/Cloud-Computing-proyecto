@@ -19,7 +19,7 @@ test('New arrivals cannot retrieve earlier chat; wardrobe persists and purchases
  assert.equal((await call('sync',{x:320,y:340},b.token)).data.messages[0].body,'After arrival');
  assert.equal((await call('avatar',{accessory:'hat'},a.token)).status,409);
  await store.mutate(a.player.id,p=>({...p,coins:12,duelRewards:{private:true},linkedAccount:'private'}));
- const buys=await Promise.all([call('shop/buy',{itemId:'hat',price:0,playerId:b.player.id},a.token),call('shop/buy',{itemId:'hat'},a.token)]);
+ const buys=await Promise.all([call('shop/buy',{itemId:'hat',price:0,playerId:b.player.id,x:390,y:310},a.token),call('shop/buy',{itemId:'hat',x:390,y:310},a.token)]);
  assert.ok(buys.every(r=>r.status===200));
  assert.equal((await store.get(a.player.id)).coins,6);
  assert.equal((await store.get(b.player.id)).coins,0);
@@ -28,6 +28,11 @@ test('New arrivals cannot retrieve earlier chat; wardrobe persists and purchases
  assert.equal((await call('me',undefined,a.token)).data.player.avatar.accessory,'hat');
  const visible=(await call('profile/'+a.player.id,undefined,b.token)).data.profile;
  assert.equal(visible.avatar.color,'#a78bfa');
+ assert.deepEqual(Object.keys(visible).sort(),['avatar','id','level','name']);
+ assert.equal((await call('profile/'+a.player.id,undefined,a.token)).data.profile.coins,6);
+ assert.equal((await call('shop/buy',{itemId:'glasses',x:1100,y:800},a.token)).status,409);
+ assert.equal((await call('shop/buy',{itemId:'glasses'},a.token)).status,400);
+ assert.equal((await store.get(a.player.id)).coins,6);
  assert.equal(visible.duelRewards,undefined);assert.equal(visible.linkedAccount,undefined);assert.equal(visible.ownedCosmetics,undefined);
  assert.equal((await call('shop/buy',{itemId:'hat'})).status,401);
  assert.equal((await call('profile/unknown',undefined,a.token)).status,404);
