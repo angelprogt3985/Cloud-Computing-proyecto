@@ -2,7 +2,9 @@ const express = require('express');
 const path = require('node:path');
 const { createHmac, timingSafeEqual, randomUUID } = require('node:crypto');
 const { NPC, ITEMS, fail, coordinates, newPlayer, startBattle, battleTurn, collect } = require('./game');
-function createApp({ store, secret, demoCode, logger = console.log, maintenanceAuth = require('./maintenance').authorizeMaintenance }) {
+const expedition = require('./expedition');
+const arena = require('./arena');
+function createApp({ store, secret, demoCode, logger = console.log, maintenanceAuth = require('./maintenance').authorizeMaintenance, accountAuth = require('./accounts').accountAuth }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '4kb' }));
@@ -36,7 +38,7 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     if (++w.n > 100) return res.status(429).json({ error: 'Demasiadas solicitudes; espera un minuto' });
     next();
   });
-  app.get('/health', async (req, res) => { try { await store.health(); res.json({ status: 'ok', database: store.kind, cloud: !!process.env.K_SERVICE, demo: process.env.GQ_DEMO_MODE === 'true', ephemeral: store.kind === 'memory' }); } catch { res.status(503).json({ status: 'degraded', database: store.kind }); } });
+  app.get('/health', async (req, res) => { try { await store.health(); res.json({ status: 'ok', database: store.kind, cloud: !!process.env.K_SERVICE, demo: process.env.GQ_DEMO_MODE === 'true', ephemeral: store.kind === 'memory', accounts:!!process.env.FIREBASE_WEB_API_KEY }); } catch { res.status(503).json({ status: 'degraded', database: store.kind }); } });
   app.post('/internal/cleanup', async (req, res) => {
     if (!await maintenanceAuth(req)) return res.status(403).json({ error: 'Acceso restringido' });
     if (!store.cleanup) return res.status(503).json({ error: 'Limpieza no disponible' });
@@ -46,15 +48,64 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
   });
   app.post('/api/join', async (req, res) => {
     if (demoCode && req.body.code !== demoCode) fail(403, 'Código de clase incorrecto');
-    const player = newPlayer(req.body.name); await store.create(player); await store.heartbeat(player, player);
+    const player = expedition.normalize(newPlayer(req.body.name)); await store.create(player); await store.heartbeat(player, player);
     res.status(201).json({ player, token: token(player.id) });
   });
+  const authAttempts=new Map();
+  app.post('/api/account', async (req,res)=>{
+    const key=req.socket.remoteAddress,now=Date.now();
+    for(const [key,v] of authAttempts) if(v.until<now) authAttempts.delete(key);
+    const tries=authAttempts.get(key)||{n:0,until:now+60000};authAttempts.set(key,tries);
+    if(++tries.n>12) fail(429,'Demasiados intentos; espera un minuto');
+    if(demoCode && req.body.code!==demoCode) fail(403,'Código de clase incorrecto');
+    const identity=await accountAuth(req.body);
+    if(identity.reset) return res.json({message:'Si la cuenta existe, recibirás un correo para restablecer tu contraseña.'});
+    const id=`account_${identity.uid}`;
+    let player=await store.get(id);
+    if(!player) {
+      let initial=expedition.normalize(newPlayer(req.body.name || 'Explorador'));
+      // A valid existing guest session may link its progress once, never by name.
+      if(req.headers.authorization) {
+        let authError;auth(req,res,e=>{authError=e;});
+        if(authError) throw authError;
+        const old=await store.get(req.playerId);
+        if(old && !old.account) {
+          initial=await store.mutate(old.id,p=>{
+            if(p.linkedAccount && p.linkedAccount!==id) fail(409,'Este personaje ya fue vinculado a otra cuenta');
+            p.linkedAccount=id;return p;
+          });
+        }
+      }
+      initial.id=id;initial.account=true;delete initial.linkedAccount;
+      if(!store.createIfAbsent) fail(503,'Este adaptador no permite cuentas persistentes');
+      player=await store.createIfAbsent(initial);
+    }
+    expedition.normalize(player);await store.heartbeat(player,player);
+    res.json({player,token:token(player.id)});
+  });
   app.use('/api', auth);
-  app.get('/api/me', async (req, res) => { const player = await store.get(req.playerId); if (!player) fail(401, 'Sesión no disponible'); res.json({ player }); });
+  async function settleArena() {
+    if(!store.arenaGet) return null;
+    let a=await store.arenaGet();
+    if(a && ['pending','active'].includes(a.status) && Date.now()>a.expiresAt) a=await store.arenaMutate(v=>arena.expired(v));
+    if(a?.status==='finished' && !a.settled) {
+      for(const fighter of a.fighters) await store.mutate(fighter.id,p=>{
+        expedition.normalize(p);
+        p.duelRewards ||= {};
+        if(!p.duelRewards[a.id]) { p.duelRewards[a.id]=true;const won=a.winner===p.id;expedition.gain(p,won?60:15);if(won){p.coins+=10;p.pvpWins++;} }
+        return p;
+      });
+      a=await store.arenaMutate(v=>{if(v?.id===a.id)v.settled=true;return v;});
+    }
+    return a;
+  }
+  const publicPlayer=p=>{expedition.normalize(p);if(p){delete p.duelRewards;delete p.linkedAccount;}return p;};
+  app.get('/api/me', async (req, res) => { const player = await store.get(req.playerId); if (!player) fail(401, 'Sesión no disponible'); res.json({ player:publicPlayer(player),quests:expedition.quests(player) }); });
   app.post('/api/sync', async (req, res) => {
     const pos = coordinates(req.body.x, req.body.y);
-    const p = await store.get(req.playerId); if (!p) fail(401, 'Sesión no disponible');
-    await store.heartbeat(p, pos); res.json({ ...(await store.room()), npc: NPC, items: ITEMS });
+    const duel=await settleArena();
+    const p = publicPlayer(await store.get(req.playerId)); if (!p) fail(401, 'Sesión no disponible');
+    await store.heartbeat(p, pos); res.json({ ...(await store.room()), player:p,quests:expedition.quests(p), npc: NPC, items: ITEMS,world:expedition.WORLD,places:expedition.PLACES,arena:duel,serverTime:Date.now() });
   });
   app.post('/api/chat', async (req, res) => {
     const body = req.body.body;
@@ -68,6 +119,27 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
   });
   app.post('/api/battle/start', async (req, res) => { const pos = coordinates(req.body.x, req.body.y); res.json({ player: await store.mutate(req.playerId, p => startBattle(Object.assign(p, pos))) }); });
   app.post('/api/battle/turn', async (req, res) => res.json({ player: await store.mutate(req.playerId, p => battleTurn(p, req.body.action, req.body.battleId, req.body.turn)) }));
+  app.post('/api/explore',async(req,res)=>{
+    const pos=coordinates(req.body.x,req.body.y);
+    const player=await store.mutate(req.playerId,p=>expedition.act(Object.assign(p,pos),req.body.action,req.body.place));
+    res.json({player,quests:expedition.quests(player),serverTime:Date.now()});
+  });
+  app.post('/api/arena/challenge',async(req,res)=>{
+    if(!store.arenaMutate) fail(503,'Arena no disponible');
+    await settleArena();
+    const room=await store.room();
+    const other=room.players.find(p=>p.id===req.body.targetId);
+    if(!other) fail(409,'Ese explorador ya no está conectado');
+    const me=await store.get(req.playerId),target=await store.get(other.id);
+    if(!me||!target) fail(409,'Jugador no disponible');
+    if(me.battle?.status==='active'||target.battle?.status==='active') fail(409,'Terminen el combate con el guardián primero');
+    const next=await store.arenaMutate(a=>arena.challenge(a,me,target));res.json({arena:next});
+  });
+  app.post('/api/arena/respond',async(req,res)=>{if(typeof req.body.accept!=='boolean')fail(400,'Respuesta inválida');res.json({arena:await store.arenaMutate(a=>arena.respond(a,req.playerId,req.body.id,req.body.accept))});});
+  app.post('/api/arena/turn',async(req,res)=>{
+    await store.arenaMutate(a=>arena.turn(a,req.playerId,req.body.id,req.body.turn,req.body.action));
+    res.json({arena:await settleArena(),player:publicPlayer(await store.get(req.playerId))});
+  });
   let assetCache;
   async function loadAsset() {
     if (process.env.ASSET_BUCKET) {

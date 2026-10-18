@@ -11,5 +11,6 @@ function validateConfig(env) {
   if (env.STORE === 'postgres' && (!env.DB_HOST || !env.DB_PASSWORD)) throw new Error('PostgreSQL requires credentials');
   if (env.STORE === 'realtime' && !env.FIREBASE_DATABASE_URL) throw new Error('Realtime Database requires FIREBASE_DATABASE_URL');
   if (env.FIRESTORE_EMULATOR_HOST) throw new Error('The emulator is local-only');
+  if (env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Authentication emulator is local-only');
 }
 module.exports = { validateConfig };

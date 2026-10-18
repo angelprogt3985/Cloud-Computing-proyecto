@@ -3,7 +3,7 @@ const { GoogleAuth } = require('google-auth-library');
 const { fail } = require('./game');
 
 function normalizePlayer(value) {
-  return value ? { ...value, collected: value.collected || [], battle: value.battle || null } : undefined;
+  return value ? require('./expedition').normalize({ ...value, collected: value.collected || [], battle: value.battle || null }) : undefined;
 }
 
 // REST keeps requests finite: no permanent database listener holding Cloud Run open.
@@ -32,6 +32,28 @@ class RealtimeStore {
     return { value: response.status === 204 ? null : await response.json(), etag: response.headers.get('etag') };
   }
   async create(player) { await this.request(`gq_players/${player.id}`, { method: 'PUT', body: player }); }
+  async createIfAbsent(player) {
+    const path=`gq_players/${player.id}`;
+    for(let i=0;i<8;i++) {
+      const current=await this.request(path,{readEtag:true});
+      if(current.value) return normalizePlayer(current.value);
+      if(!current.etag) throw new Error('Missing ETag');
+      const saved=await this.request(path,{method:'PUT',body:player,etag:current.etag});
+      if(!saved.conflict) return normalizePlayer(player);
+    }
+    fail(409,'Vuelve a intentar el inicio de sesión');
+  }
+  async arenaGet() { return (await this.request('gq_arena/current')).value; }
+  async arenaMutate(fn) {
+    for(let i=0;i<8;i++) {
+      const current=await this.request('gq_arena/current',{readEtag:true});
+      if(!current.etag) throw new Error('Missing arena ETag');
+      const next=fn(current.value);
+      const saved=await this.request('gq_arena/current',{method:'PUT',body:next,etag:current.etag});
+      if(!saved.conflict) return next;
+    }
+    fail(409,'La arena cambió; sincroniza e intenta de nuevo');
+  }
   async get(id) { return normalizePlayer((await this.request(`gq_players/${id}`)).value); }
   async mutate(id, fn) {
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -47,7 +69,7 @@ class RealtimeStore {
     fail(409, 'Otra acción está actualizando tu partida; vuelve a intentar');
   }
   async heartbeat(player, position) {
-    await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, x: position.x, y: position.y, seenAt: this.now() } });
+    await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, level:player.level || 1, x: position.x, y: position.y, seenAt: this.now() } });
   }
   async room() {
     if (this.roomCache && this.now() - this.roomCache.at < 500) return structuredClone(this.roomCache.value);

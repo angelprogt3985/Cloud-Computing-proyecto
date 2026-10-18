@@ -1,132 +1,137 @@
+import { createSoundscape } from './soundscape.js';
 import { mergeMessages } from './chat-state.mjs';
-const $ = id => document.getElementById(id);
-const canvas = $('map-canvas'), ctx = canvas.getContext('2d');
-let token = sessionStorage.getItem('gq-session'), player, target, npc = { x: 520, y: 160, name: 'Guardián' }, items = [], remotes = [], collecting = new Set(), busy = false, running = false;
-const POLL_MS = 1500;
-let messages = [];
-function showMessages(incoming) {
-  const next = mergeMessages(messages, incoming);
-  if (next.length === messages.length && next.every((message, i) => message.id === messages[i].id)) return;
-  messages = next; $('chat-list').replaceChildren();
-  for (const m of messages) { const p = document.createElement('p'); const b = document.createElement('b'); b.textContent = m.player_name + ': '; p.append(b, document.createTextNode(m.body)); $('chat-list').append(p); }
-  $('chat-list').scrollTop = $('chat-list').scrollHeight;
+import { render, camera, W, H } from './world.js';
+const $=id=>document.getElementById(id),canvas=$('map-canvas'),minimap=$('minimap');
+let token=localStorage.getItem('gq-session')||sessionStorage.getItem('gq-session');
+let player,target,npc={x:520,y:160},items=[],places=[],remotes=[],messages=[],duel=null,mode='login',battleMode='pve';
+let playing=false,drawer=null,busy=false,started=false,mutation=0,clockOffset=0,energy=100,nearest=null,lastQuests='',lastPeople='',closedDuel='',fishing=false,local=false;
+const sound=createSoundscape();
+function audioSettings(){$('music-toggle').textContent=sound.enabled?'Sonido activado':'Sonido silenciado';$('music-toggle').setAttribute('aria-pressed',String(sound.enabled));$('music-volume').value=Math.round(sound.volume*100);$('volume-label').textContent=Math.round(sound.volume*100)+'%';$('sound-status').textContent=sound.playing?'Aurora boreal · sonando':!sound.enabled||sound.volume===0?'Sonido silenciado':'Aurora boreal · pulsa activar sonido para escuchar';}
+$('music-toggle').onclick=async()=>{await sound.toggle();audioSettings();};
+$('music-volume').oninput=e=>{sound.setVolume(Number(e.target.value)/100);audioSettings();};audioSettings();
+const keys=new Set(),collecting=new Set();
+let noticeTimer;const notice=t=>{$('notice').textContent=t;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('notice').textContent='',6000);};
+const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
+function closeDrawer(){drawer=null;document.body.classList.remove('drawer-open');$('game-drawer').hidden=true;for(const id of ['open-menu','open-chat','open-quests','open-players'])$(id).setAttribute('aria-expanded','false');if(playing)canvas.focus();}
+function openDrawer(which){if(!playing)return;if(drawer===which){closeDrawer();return;}drawer=which;document.body.classList.add('drawer-open');$('game-drawer').dataset.view=which;keys.clear();target=null;$('game-drawer').hidden=false;$('journal-drawer').hidden=!['quests','players'].includes(which);$('chat-drawer').hidden=which!=='chat';$('menu-drawer').hidden=which!=='menu';$('drawer-title').textContent={quests:'Diario de expedición',players:'Exploradores',chat:'Conversación',menu:'Menú'}[which];for(const id of ['menu','chat','quests','players'])$('open-'+id).setAttribute('aria-expanded',String(id===which));if(which==='menu')audioSettings();if(which==='quests'||which==='players')tab(which);if(which==='chat'){$('chat-badge').hidden=true;$('chat-list').scrollTop=$('chat-list').scrollHeight;$('chat-input').focus();}else $('close-drawer').focus();}
+for(const which of ['menu','quests','chat','players'])$('open-'+which).onclick=()=>openDrawer(which);
+$('close-drawer').onclick=$('resume-game').onclick=closeDrawer;
+function titleScreen(){playing=false;sound.setActive(false);$('game-root').inert=true;keys.clear();target=null;closeDrawer();$('join-overlay').hidden=true;$('title-screen').hidden=false;document.body.classList.add('at-title');$('title-player').textContent=player?`${player.name} · Nivel ${player.level||1} · Tu expedición te espera`:'Explora. Descubre. Desafía a tus amigos.';$('play-game').focus();}
+$('return-title').onclick=titleScreen;$('back-title').onclick=()=>{if(playing){$('join-overlay').hidden=true;canvas.focus();}else titleScreen();};
+$('play-game').onclick=()=>{sound.unlock();if(player)launch();else{$('join-overlay').hidden=false;$('join-email').focus();}};
+function launch(){playing=true;sound.setActive(true);sound.unlock().then(audioSettings);$('game-root').inert=false;document.body.classList.remove('at-title');$('title-screen').hidden=true;$('join-overlay').hidden=true;closeDrawer();hud();loadAsset();if(!started){started=true;sync();}canvas.focus();}
+$('toggle-minimap').onclick=()=>{const show=$('minimap').hidden;$('minimap').hidden=!show;$('toggle-minimap').setAttribute('aria-pressed',String(show));$('toggle-minimap').textContent=show?'Ocultar minimapa':'Mostrar minimapa';};
+$('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{notice('El juego ya ocupa toda la ventana. Puedes usar F11 en tu navegador.');}};
+document.addEventListener('fullscreenchange',()=>{$('fullscreen').textContent=document.fullscreenElement?'Salir de pantalla completa':'Pantalla completa';});
+function error(e){notice(e.message);if(e.status===401){token=null;player=null;localStorage.removeItem('gq-session');sessionStorage.removeItem('gq-session');$('join-overlay').hidden=false;}}
+async function api(path,body){const r=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});const d=await r.json();if(!r.ok){const e=new Error(d.error||'No se pudo conectar');e.status=r.status;throw e;}return d;}
+function setPlayer(p){if(!p)return;const xy=player?{x:player.x,y:player.y}:{};const old=player?.level||1;player={...p,...xy};if(player.level>old)notice(`¡Nivel ${player.level}! Más salud y fuerza para tu expedición.`);hud();}
+function hud(){if(!player)return;const level=player.level||1,xp=player.xp||0,base=60*(level-1)**2,next=60*level**2;
+ $('hud-name').textContent=player.name;$('level').textContent=`Nivel ${level} · ${level>4?'Guardián del norte':level>2?'Explorador de escarcha':'Viajero del hielo'}`;
+ $('coins').textContent=player.coins;$('fish').textContent=player.fish;$('health').max=player.maxHp;$('health').value=player.hp;$('health-label').textContent=`${player.hp} / ${player.maxHp}`;$('xp').max=next-base;$('xp').value=xp-base;$('xp-label').textContent=`${xp-base} / ${next-base} EXP`;
+ $('link-account').hidden=!!player.account||local;$('save-status').textContent=player.account?'Cuenta vinculada · Progreso guardado':'Personaje de práctica';renderBattle();
 }
-fetch('/health').then(r => r.json()).then(d => { $('demo-warning').hidden = !d.ephemeral; }).catch(() => {});
-async function api(path, body) {
-  const r = await fetch('/api/' + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(12000) });
-  const data = await r.json(); if (!r.ok) { const e = new Error(data.error || 'Error del servidor'); e.status = r.status; throw e; } return data;
+function showQuests(q=[]){const key=JSON.stringify(q);if(key===lastQuests)return;lastQuests=key;$('quests').replaceChildren();for(const quest of q){const card=el('div',undefined,'quest'+(quest.claimed?' done':'')),top=el('div',undefined,'quest-top');top.append(el('span',quest.name,'quest-title'),el('span',`+${quest.xp} EXP`,'reward'));const progress=el('progress');progress.max=quest.goal;progress.value=quest.current;card.append(top,el('small',quest.claimed?'Completada':`${quest.current} / ${quest.goal} · +${quest.coins} monedas`),progress);if(quest.current===quest.goal&&!quest.claimed){const btn=el('button','Reclamar recompensa');btn.onclick=()=>explore('quest',quest.id);card.append(btn);}$('quests').append(card);}}
+function showPeople(){const key=JSON.stringify(remotes.map(p=>[p.id,p.name,p.level]));if(key!==lastPeople){lastPeople=key;$('players').replaceChildren();if(!remotes.length)$('players').append(el('p','Todavía estás solo. Invita a un amigo a entrar al mundo.','muted'));for(const p of remotes){const row=el('div',undefined,'player-row'),label=el('span',p.name);label.append(el('small',`Nivel ${p.level||1} · En línea`));const btn=el('button','Desafiar');btn.onclick=()=>challenge(p.id);row.append(label,btn);$('players').append(row);}}$('arena-status').textContent=duel?.status==='active'?'Arena ocupada: hay un duelo en curso.':duel?.status==='pending'?'Hay una invitación pendiente.':'Arena abierta · Duelo justo: 40 PV para ambos.';}
+function tab(which){$('quest-panel').hidden=which!=='quests';$('players-panel').hidden=which!=='players';$('tab-quests').classList.toggle('selected',which==='quests');$('tab-players').classList.toggle('selected',which==='players');}
+$('tab-quests').onclick=()=>tab('quests');$('tab-players').onclick=()=>tab('players');
+function showMessages(incoming){
+ const next=mergeMessages(messages,incoming);
+ if(next.length===messages.length&&next.every((m,i)=>m.id===messages[i].id))return;
+ const fresh=next.filter(m=>!messages.some(old=>old.id===m.id));
+ if(messages.length&&drawer!=='chat'&&fresh.some(m=>m.player_name!==player?.name))$('chat-badge').hidden=false;
+ const list=$('chat-list'),oldScroll=list.scrollTop;
+ const follow=list.scrollHeight-list.clientHeight-list.scrollTop<48||fresh.some(m=>m.player_name===player?.name);
+ messages=next;list.replaceChildren();
+ for(const m of messages){
+  const p=el('p',undefined,'chat-message'+(m.player_name===player?.name?' own':''));
+  p.append(el('b',m.player_name),el('span',m.body));list.append(p);
+ }
+ list.scrollTop=follow?list.scrollHeight:oldScroll;
 }
-function error(e) { $('notice').textContent = e.message; if (e.status === 401) { sessionStorage.removeItem('gq-session'); token = null; player = null; $('join-overlay').hidden = false; } }
-function setPlayer(p) { const xy = player ? { x: player.x, y: player.y } : {}; player = { ...p, ...xy }; hud(); }
-function hud() {
-  if (!player) return;
-  $('hud-name').textContent = player.name;
-  $('hud-stats').textContent = `${player.hp}/${player.maxHp} PV · ${player.coins} monedas · ${player.fish} peces`;
-  const b = player.battle;
-  if (b && ! $('battle-overlay').hidden) {
-    $('battle-status').textContent = `Tú ${player.hp}/${player.maxHp} PV · Guardián ${b.hp}/${b.maxHp} PV`;
-    $('enemy-hp').value = b.hp; $('your-hp').value = player.hp;
-    $('intent').textContent = b.status === 'active' ? `Próxima acción: ${b.intent}` : ({ won: '¡Victoria!', lost: 'Derrota de práctica', escaped: 'Te retiraste' }[b.status]);
-    $('battle-log').textContent = b.log.join(' ');
-    $('heal').textContent = `Curar +12 (${b.potions})`;
-    for (const btn of document.querySelectorAll('[data-action]')) btn.disabled = busy || b.status !== 'active' || (btn.dataset.action === 'heal' && (!b.potions || player.hp === player.maxHp));
-    $('close-battle').disabled = busy;
-    $('close-battle').textContent = b.status === 'active' ? 'Cerrar y continuar después' : 'Volver a la plaza';
+async function loadAsset(){try{const r=await fetch('/api/asset',{headers:{Authorization:'Bearer '+token}});if(!r.ok)return;const old=$('banner').src;$('banner').src=URL.createObjectURL(await r.blob());if(old.startsWith('blob:'))URL.revokeObjectURL(old);$('asset-source').textContent='Recurso visual: '+r.headers.get('X-Asset-Source');}catch{}}
+async function inspect(){try{const d=await api('services');$('services').replaceChildren();for(const s of d.services)$('services').append(el('li',`${s.name}: ${s.status}`));$('checked').textContent='Actualizado: '+new Date(d.checkedAt).toLocaleTimeString();loadAsset();}catch(e){error(e);}}
+$('technical').onclick=()=>{closeDrawer();$('technical-overlay').hidden=false;inspect();};$('close-technical').onclick=()=>{$('technical-overlay').hidden=true;openDrawer('menu');};$('refresh-services').onclick=inspect;
+function authMode(next){mode=next;$('name-field').hidden=mode!=='register';$('join-name').required=mode==='register';$('login-tab').classList.toggle('selected',mode==='login');$('register-tab').classList.toggle('selected',mode==='register');$('auth-title').textContent=mode==='login'?'Volver a la expedición':'Tu primer paso al norte';$('join-button').textContent=mode==='login'?'Entrar al mundo →':'Crear mi explorador →';$('join-password').autocomplete=mode==='login'?'current-password':'new-password';$('join-error').textContent='';}
+$('login-tab').onclick=()=>authMode('login');$('register-tab').onclick=()=>authMode('register');
+async function begin(d){token=d.token||token;localStorage.setItem('gq-session',token);sessionStorage.removeItem('gq-session');player=d.player;$('join-password').value='';launch();}
+$('join-form').onsubmit=async e=>{e.preventDefault();$('join-button').disabled=true;try{await begin(await api('account',{mode,email:$('join-email').value.trim(),password:$('join-password').value,name:$('join-name').value.trim(),code:$('join-code').value}));}catch(e){$('join-error').textContent=e.message;}finally{$('join-button').disabled=false;}};
+$('guest').onclick=async()=>{try{await begin(await api('join',{name:$('join-name').value.trim()||'Explorador local',code:$('join-code').value}));}catch(e){$('join-error').textContent=e.message;}};
+$('reset-password').onclick=async()=>{try{const d=await api('account',{mode:'reset',email:$('join-email').value.trim(),code:$('join-code').value});$('join-error').textContent=d.message;}catch(e){$('join-error').textContent=e.message;}};
+$('link-account').onclick=()=>{authMode('register');$('join-name').value=player.name;$('join-overlay').hidden=false;};
+$('logout').onclick=()=>{localStorage.removeItem('gq-session');sessionStorage.removeItem('gq-session');location.reload();};
+fetch('/health').then(r=>r.json()).then(d=>{local=d.ephemeral;$('guest').hidden=d.cloud;$('demo-warning').hidden=!d.ephemeral;if(!d.accounts&&!d.cloud){$('join-error').textContent='Usa «Probar sin cuenta» para explorar esta versión local.';$('name-field').hidden=false;}}).catch(()=>{});
+async function sync(){try{if(playing&&player&&!document.hidden){const version=mutation;const d=await api('sync',{x:player.x,y:player.y});remotes=d.players.filter(p=>p.id!==player.id).map(p=>{const old=remotes.find(r=>r.id===p.id);return {...p,drawX:old?.drawX??p.x,drawY:old?.drawY??p.y};});npc=d.npc;items=d.items;places=d.places||[];clockOffset=d.serverTime-Date.now();if(version===mutation&&!busy){setPlayer(d.player);showQuests(d.quests);}setArena(d.arena);showPeople();showMessages(d.messages);$('online').textContent=`${d.players.length} explorador${d.players.length===1?'':'es'}`;$('connection').textContent='Conectado';}}catch(e){$('connection').textContent='Reconectando';error(e);}finally{setTimeout(sync,1500);}}
+$('chat-form').onsubmit=async e=>{e.preventDefault();const body=$('chat-input').value.trim();if(!body)return;const btn=e.currentTarget.querySelector('button');btn.disabled=true;try{const d=await api('chat',{body});showMessages([d.message]);if($('chat-input').value.trim()===body)$('chat-input').value='';}catch(e){error(e);}finally{btn.disabled=false;}};
+async function explore(action,place){if(busy||!player)return;busy=true;mutation++;try{const d=await api('explore',{action,place,x:player.x,y:player.y});setPlayer(d.player);showQuests(d.quests);clockOffset=d.serverTime-Date.now();fishing=action==='cast';notice({quest:'¡Misión completada! Recompensa guardada.',rest:'El calor del refugio te devuelve la energía.',explore:'Lugar descubierto. Sigue explorando el glaciar.',cast:'Anzuelo al agua… espera la señal y pulsa E.',catch:'¡Buena captura! +20 EXP y un pez.'}[action]);}catch(e){fishing=false;error(e);}finally{busy=false;canvas.focus();}}
+function interact(){if(!nearest||busy||!player)return;if(nearest.kind==='arena'){openDrawer('players');explore('explore',nearest.id);}else if(nearest.kind==='fish'){const now=Date.now()+clockOffset;if(fishing&&player.fishing&&now<=player.fishing.until)explore('catch',nearest.id);else explore('cast',nearest.id);}else explore(nearest.kind==='camp'?'rest':'explore',nearest.id);}
+$('interact-button').onclick=interact;
+async function challenge(id){if(busy)return;busy=true;try{setArena((await api('arena/challenge',{targetId:id})).arena);notice('Invitación enviada. Esperando respuesta…');}catch(e){error(e);}finally{busy=false;}}
+function setArena(a){if(!playing)return;if(duel&&a&&duel.id===a.id&&duel.turn>a.turn)return;duel=a;if(!player)return;const participates=a?.fighters.some(p=>p.id===player.id);$('invite-overlay').hidden=!(participates&&a.status==='pending'&&a.fighters[1].id===player.id);if(!$('invite-overlay').hidden)$('invite-text').textContent=`${a.fighters[0].name} quiere medirse contigo.`;
+ if(participates&&a.status==='active'){battleMode='pvp';$('battle-overlay').hidden=false;target=null;}
+ if(participates&&['finished','expired'].includes(a.status)&&closedDuel!==a.id&&battleMode==='pvp')$('battle-overlay').hidden=false;
+ renderBattle();}
+async function respond(accept){try{setArena((await api('arena/respond',{id:duel.id,accept})).arena);}catch(e){error(e);}}
+$('accept-duel').onclick=()=>respond(true);$('reject-duel').onclick=()=>respond(false);
+let lastAnimation='',animationTimers=[];
+function animateBattle(b){
+ const key=b.id+':'+b.turn;if(key===lastAnimation)return;
+ const same=lastAnimation.startsWith(b.id+':');lastAnimation=key;
+ for(const timer of animationTimers)clearTimeout(timer);animationTimers=[];
+ if(!same||!b.events?.length)return;
+ const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ for(const [i,event] of b.events.entries())animationTimers.push(setTimeout(()=>{
+  if($('battle-overlay').hidden)return;
+  const actor=$(event.actor===player.id?'fighter-you':'fighter-enemy'),target=$(event.target===player.id?'fighter-you':'fighter-enemy');
+  sound.effect(event.action);
+  const effect=el('i',event.damage?`−${event.damage}`:event.heal?`+${event.heal}`:event.action==='charge'?'Cargando':'◇','combat-float '+event.action);target.append(effect);setTimeout(()=>effect.remove(),1200);
+  if(reduced)return;
+  const sprite=actor.querySelector('.fighter-sprite'),victim=target.querySelector('.fighter-sprite');
+  if(['attack','power','frost'].includes(event.action)){
+   const direction=event.actor===player.id?1:-1;
+   sprite.animate([{transform:'translateX(0)'},{transform:`translateX(${direction*26}px) rotate(${direction*12}deg)`},{transform:'translateX(0)'}],{duration:400});
+   victim.animate([{filter:'brightness(1)'},{filter:event.action==='frost'?'brightness(2) drop-shadow(0 0 15px #9deaff)':'brightness(2)',transform:'translateY(-6px)'},{filter:'brightness(1)',transform:'translateY(0)'}],{duration:550});
+   const burst=el('i',event.action==='frost'?'❄':event.action==='power'?'✦':'╱','combat-burst '+event.action);target.append(burst);setTimeout(()=>burst.remove(),800);
+  }else sprite.animate([{filter:'brightness(1)'},{filter:'brightness(1.8) drop-shadow(0 0 18px #8bdfd0)'},{filter:'brightness(1)'}],{duration:650});
+ },i*650));
+}
+function renderBattle(){if(!player||$('battle-overlay').hidden)return;const pvp=battleMode==='pvp',b=pvp?duel:player.battle;if(!b)return;const me=pvp?b.fighters.find(p=>p.id===player.id):player,enemy=pvp?b.fighters.find(p=>p.id!==player.id):b;if(!me||!enemy)return;
+ animateBattle(b);$('battle-energy').textContent=`Energía ${'◆'.repeat((pvp?me.focus:b.focus)??2)}${'◇'.repeat(3-((pvp?me.focus:b.focus)??2))} / 3${pvp&&me.chilled?' · Escarcha: tu próximo ataque causa 4 menos':''}`;
+ $('fighter-enemy').querySelector('.fighter-sprite').textContent=pvp?'🐧':'♜';
+ $('battle-title').textContent=pvp?'Duelo de exploradores':'Guardián de hielo';$('battle-you').textContent=player.name;$('battle-enemy').textContent=pvp?enemy.name:'Guardián';$('your-hp').max=me.maxHp;$('your-hp').value=me.hp;$('enemy-hp').max=enemy.maxHp;$('enemy-hp').value=enemy.hp;$('battle-status').textContent=`${me.hp} / ${me.maxHp} PV · Rival ${enemy.hp} / ${enemy.maxHp} PV`;
+ const active=b.status==='active',myTurn=!pvp||b.next===player.id;
+ $('intent').textContent=active?(pvp?(myTurn?'Tu turno · Elige con cuidado':'Tu rival está pensando…'):`Próxima acción: ${b.intent}`):(pvp?(b.status==='expired'?'El duelo caducó por inactividad':b.winner===player.id?'¡Victoria! +60 EXP y 10 monedas':'Duelo terminado · +15 EXP por participar'):{won:'¡Victoria! +45 EXP y 10 monedas',lost:'La próxima vez será tuya',escaped:'Te retiras del combate'}[b.status]);
+ $('battle-log').textContent=b.log.join(' ');const potions=pvp?me.potions:b.potions;$('heal').textContent=`✚ Curar (${potions})`;
+ for(const btn of document.querySelectorAll('[data-action]'))btn.disabled=busy||!active||!myTurn||(((pvp?me.focus:b.focus)??2)<({power:2,frost:1}[btn.dataset.action]||0))||(btn.dataset.action==='heal'&&(!potions||me.hp===me.maxHp));
+ $('close-battle').hidden=active&&pvp;$('close-battle').textContent=active?'Ocultar combate':'Volver a explorar';}
+$('duel').onclick=async()=>{if(busy||!player)return;busy=true;mutation++;target=null;try{setPlayer((await api('battle/start',{x:player.x,y:player.y})).player);battleMode='pve';$('battle-overlay').hidden=false;}catch(e){error(e);}finally{busy=false;hud();}};
+for(const btn of document.querySelectorAll('[data-action]'))btn.onclick=async()=>{if(busy)return;busy=true;mutation++;renderBattle();try{if(battleMode==='pvp'){const d=await api('arena/turn',{id:duel.id,turn:duel.turn,action:btn.dataset.action});setArena(d.arena);setPlayer(d.player);}else{const b=player.battle;setPlayer((await api('battle/turn',{battleId:b.id,turn:b.turn,action:btn.dataset.action})).player);}}catch(e){error(e);try{setPlayer((await api('me')).player);}catch{}}finally{busy=false;renderBattle();}};
+$('close-battle').onclick=()=>{if(battleMode==='pvp'&&duel)closedDuel=duel.id;$('battle-overlay').hidden=true;canvas.focus();};
+canvas.addEventListener('pointerdown',e=>{if(!playing||drawer||!player||!$('battle-overlay').hidden)return;const r=canvas.getBoundingClientRect();target={x:Math.max(16,Math.min(W-16,camera.x+(e.clientX-r.left)*canvas.width/r.width)),y:Math.max(16,Math.min(H-16,camera.y+(e.clientY-r.top)*canvas.height/r.height))};canvas.focus();});
+const directions={w:[0,-1],a:[-1,0],s:[0,1],d:[1,0],arrowup:[0,-1],arrowdown:[0,1],arrowleft:[-1,0],arrowright:[1,0]};
+window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement?.tagName)||!playing||!player||!$('join-overlay').hidden||!$('technical-overlay').hidden||!$('battle-overlay').hidden)return;const k=e.key.toLowerCase();if(drawer)return;if(directions[k]||k==='shift'){e.preventDefault();keys.add(k);target=null;}if(k==='e'&&!e.repeat){e.preventDefault();interact();}});
+window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear();});
+for(const btn of document.querySelectorAll('[data-move]')){const k={up:'w',down:'s',left:'a',right:'d'}[btn.dataset.move];btn.onpointerdown=e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);keys.add(k);target=null;};btn.onpointerup=btn.onpointercancel=()=>keys.delete(k);}
+let last=0;
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;let moving=false;
+ if(player&&playing){const free=!drawer&&$('join-overlay').hidden&&$('battle-overlay').hidden&&$('invite-overlay').hidden&&$('technical-overlay').hidden;
+  if(free){let dx=0,dy=0;for(const k of keys){const v=directions[k];if(v){dx+=v[0];dy+=v[1];}}let dist=Math.hypot(dx,dy);const keyboard=dist>0;if(!dist&&target){dx=target.x-player.x;dy=target.y-player.y;dist=Math.hypot(dx,dy);if(dist<2)target=null;}const sprint=keys.has('shift')&&energy>1&&dist>0;const step=(sprint?290:165)*dt;energy=Math.max(0,Math.min(100,energy+(sprint?-24:16)*dt));if(dist>0){moving=true;player.x=Math.max(16,Math.min(W-16,player.x+dx/dist*(keyboard?step:Math.min(step,dist))));player.y=Math.max(16,Math.min(H-16,player.y+dy/dist*(keyboard?step:Math.min(step,dist))));}
+  for(const item of items)if(!busy&&!player.collected.includes(item.id)&&!collecting.has(item.id)&&player.battle?.status!=='active'&&Math.hypot(player.x-item.x,player.y-item.y)<22){collecting.add(item.id);mutation++;api('collect',{itemId:item.id,x:player.x,y:player.y}).then(d=>{setPlayer(d.player);notice('Hallazgo guardado · +12 EXP');}).catch(error).finally(()=>setTimeout(()=>collecting.delete(item.id),2000));}
   }
+  $('stamina').value=energy;nearest=places.filter(p=>Math.hypot(p.x-player.x,p.y-player.y)<80).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0];$('interaction').hidden=!nearest||!free;
+  if(nearest){let hint=nearest.hint;if(nearest.kind==='fish'&&fishing&&player.fishing){const time=Date.now()+clockOffset;hint=time<player.fishing.biteAt?'Espera… el agua se mueve':time<=player.fishing.until?'¡AHORA! Pulsa E para recoger':'El pez escapó. Vuelve a lanzar.';}$('interact-hint').textContent=hint;}
+  const closest=places.slice().sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0];if(closest){$('zone-name').textContent=closest.name;$('zone-sub').textContent=(player.discovered||[]).includes(closest.id)?'Territorio descubierto':'Territorio por descubrir';}
+  $('duel').disabled=busy||Math.hypot(player.x-npc.x,player.y-npc.y)>52||duel?.status==='active';
+ }
+ render(canvas,minimap,{player,remotes,items,target,npc,moving},dt,now);requestAnimationFrame(frame);
 }
-async function inspectServices() {
-  try {
-    const d = await api('services'); $('services').replaceChildren();
-    for (const s of d.services) { const li = document.createElement('li'); const strong = document.createElement('strong'); strong.textContent = s.name + ': '; li.append(strong, document.createTextNode(s.status)); $('services').append(li); }
-    $('checked').textContent = 'Comprobado: ' + new Date(d.checkedAt).toLocaleTimeString();
-    const r = await fetch('/api/asset', { headers: { Authorization: 'Bearer ' + token } });
-    if (!r.ok) throw new Error('No se pudo cargar el recurso de Storage');
-    const old = $('banner').src; $('banner').src = URL.createObjectURL(await r.blob()); if (old.startsWith('blob:')) URL.revokeObjectURL(old);
-    $('asset-source').textContent = 'Recurso visual: ' + r.headers.get('X-Asset-Source');
-  } catch(e) { error(e); }
-}
-async function begin() {
-  $('join-overlay').hidden = true; hud(); inspectServices();
-  if (player.battle?.status === 'active') { $('battle-overlay').hidden = false; hud(); }
-  if (!running) { running = true; sync(); requestAnimationFrame(frame); }
-}
-$('join-form').addEventListener('submit', async e => {
-  e.preventDefault(); const btn = $('join-button'); btn.disabled = true;
-  try { const d = await api('join', { name: $('join-name').value, code: $('join-code').value }); token = d.token; sessionStorage.setItem('gq-session', token); player = d.player; await begin(); }
-  catch(e) { $('join-error').textContent = e.message; } finally { btn.disabled = false; }
+if(token){$('play-game').disabled=true;$('title-player').textContent='Recuperando tu explorador…';api('me').then(d=>{player=d.player;hud();titleScreen();}).catch(()=>{localStorage.removeItem('gq-session');sessionStorage.removeItem('gq-session');token=null;titleScreen();}).finally(()=>$('play-game').disabled=false);}
+requestAnimationFrame(frame);
+
+window.addEventListener('keydown',e=>{
+ if(!playing||!$('join-overlay').hidden||!$('battle-overlay').hidden||!$('invite-overlay').hidden||!$('technical-overlay').hidden)return;
+ if(e.key==='Escape'){e.preventDefault();if(drawer)closeDrawer();else openDrawer('menu');return;}
+ if(e.key==='Tab'&&drawer){const nodes=[...$('game-drawer').querySelectorAll('button,input')].filter(n=>!n.disabled&&n.getClientRects().length);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}return;}
+ if(e.repeat||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+ const which={q:'quests',c:'chat',p:'players'}[e.key.toLowerCase()];if(which){e.preventDefault();openDrawer(which);}
 });
-async function sync() {
-  try {
-    if (player && !document.hidden) {
-      const d = await api('sync', { x: player.x, y: player.y });
-      remotes = d.players.filter(p => p.id !== player.id).map(p => { const prev = remotes.find(r => r.id === p.id); return { ...p, drawX: prev?.drawX ?? p.x, drawY: prev?.drawY ?? p.y }; });
-      npc = d.npc; items = d.items; $('online').textContent = `${d.players.length} en la plaza`;
-      $('connection').textContent = 'Conectado'; showMessages(d.messages);
-    }
-  } catch(e) { $('connection').textContent = 'Reconectando…'; error(e); }
-  finally { setTimeout(sync, POLL_MS); }
-}
-$('chat-form').addEventListener('submit', async e => {
-  e.preventDefault(); const body = $('chat-input').value.trim(); if (!body) return;
-  const btn = e.currentTarget.querySelector('button'); btn.disabled = true;
-  try { const d = await api('chat', { body }); showMessages([d.message]); if ($('chat-input').value.trim() === body) $('chat-input').value = ''; $('notice').textContent = 'Mensaje enviado'; } catch(e) { error(e); } finally { btn.disabled = false; }
-});
-$('refresh-services').addEventListener('click', inspectServices);
-canvas.addEventListener('pointerdown', e => {
-  if (!player || ! $('battle-overlay').hidden) return;
-  const r = canvas.getBoundingClientRect();
-  target = { x: Math.max(16, Math.min(624, (e.clientX - r.left) * 640 / r.width)), y: Math.max(16, Math.min(384, (e.clientY - r.top) * 400 / r.height)) };
-  canvas.focus();
-});
-canvas.addEventListener('keydown', e => {
-  const delta = { ArrowUp: [0,-35], ArrowDown: [0,35], ArrowLeft: [-35,0], ArrowRight: [35,0] }[e.key];
-  if (delta && player && $('battle-overlay').hidden) { e.preventDefault(); target = { x: Math.max(16,Math.min(624,player.x+delta[0])), y: Math.max(16,Math.min(384,player.y+delta[1])) }; }
-});
-$('duel').addEventListener('click', async () => {
-  if (!player || busy) return; busy = true; target = null;
-  try { const d = await api('battle/start', { x: player.x, y: player.y }); setPlayer(d.player); $('battle-overlay').hidden = false; }
-  catch(e) { error(e); } finally { busy = false; hud(); }
-});
-for (const btn of document.querySelectorAll('[data-action]')) btn.addEventListener('click', async () => {
-  if (busy) return; busy = true; hud();
-  try { const b = player.battle; setPlayer((await api('battle/turn', { action: btn.dataset.action, battleId: b.id, turn: b.turn })).player); }
-  catch(e) { error(e); try { setPlayer((await api('me')).player); } catch(e2) { error(e2); } }
-  finally { busy = false; hud(); }
-});
-$('close-battle').addEventListener('click', () => { $('battle-overlay').hidden = true; target = null; });
-let last = 0;
-function frame(time) {
-  const dt = Math.min(0.05, (time-last)/1000); last = time;
-  if (player && $('battle-overlay').hidden) {
-    if (target) { const dx=target.x-player.x, dy=target.y-player.y, dist=Math.hypot(dx,dy), step=160*dt;
-      if (dist <= step) { player.x=target.x; player.y=target.y; target=null; } else { player.x+=dx/dist*step; player.y+=dy/dist*step; }
-    }
-    $('duel').disabled = busy || Math.hypot(player.x-npc.x,player.y-npc.y)>52;
-    for (const item of items) if (!player.collected.includes(item.id) && !collecting.has(item.id) && player.battle?.status !== 'active' && Math.hypot(player.x-item.x,player.y-item.y)<22) {
-      collecting.add(item.id); api('collect',{ itemId:item.id,x:player.x,y:player.y }).then(d=>{setPlayer(d.player); $('notice').textContent='Objeto guardado en tu inventario';}).catch(error).finally(()=>setTimeout(()=>collecting.delete(item.id),2000));
-    }
-  }
-  draw(dt); requestAnimationFrame(frame);
-}
-function penguin(x,y,color,label) {
-  ctx.fillStyle='#16455722'; ctx.beginPath(); ctx.ellipse(x,y+13,18,6,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x,y,14,19,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(x,y+5,9,11,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#183345';ctx.beginPath();ctx.arc(x-4,y-7,2,0,Math.PI*2);ctx.arc(x+4,y-7,2,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#efae45';ctx.beginPath();ctx.moveTo(x-4,y-2);ctx.lineTo(x+4,y-2);ctx.lineTo(x,y+3);ctx.fill();
-  ctx.fillStyle='#173b50';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.fillText(label,x,Math.min(396,y+34));
-}
-function draw(dt) {
-  ctx.fillStyle='#dceff1';ctx.fillRect(0,0,640,400);
-  ctx.fillStyle='#9dd4df';ctx.beginPath();ctx.ellipse(318,188,225,118,-.1,0,Math.PI*2);ctx.fill();
-  ctx.strokeStyle='#ffffff80';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(318,188,200,97,-.1,0,Math.PI*2);ctx.stroke();
-  ctx.fillStyle='#f4faf6';for(const [x,y] of [[15,20],[140,35],[470,25],[615,240],[25,220]]) {ctx.beginPath();ctx.arc(x,y,45,0,Math.PI*2);ctx.fill();}
-  ctx.font='bold 13px sans-serif';ctx.fillStyle='#557e89';ctx.textAlign='left';ctx.fillText('LAGUNA BOREAL',24,32);
-  for (const i of items) if (!player?.collected.includes(i.id)) {ctx.fillStyle=i.type==='coin'?'#e9aa37':'#378f83';ctx.beginPath();ctx.ellipse(i.x,i.y,9,i.type==='coin'?9:5,0,0,Math.PI*2);ctx.fill();}
-  if(target) {ctx.strokeStyle='#238796';ctx.beginPath();ctx.arc(target.x,target.y,9,0,Math.PI*2);ctx.stroke();}
-  penguin(npc.x,npc.y,'#725b9b','Guardián');
-  for(const p of remotes) {p.drawX+=(p.x-p.drawX)*Math.min(1,dt*8);p.drawY+=(p.y-p.drawY)*Math.min(1,dt*8);penguin(p.drawX,p.drawY,'#ca8451',p.name);}
-  if(player) penguin(player.x,player.y,'#237a95',player.name);
-}
-if (token) api('me').then(d=>{player=d.player;begin();}).catch(e=>{token=null;sessionStorage.removeItem('gq-session');$('join-error').textContent=e.message;});
-draw(0);
