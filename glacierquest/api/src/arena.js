@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const { fail } = require('./game');
+const { duelLoadout } = require('./wardrobe');
 function participant(a,id) { if (!a || !a.fighters.some(p=>p.id===id)) fail(403,'No participas en este duelo'); }
 function expired(a, now=Date.now()) {
   if (a && ['pending','active'].includes(a.status) && now>a.expiresAt) { a.status='expired';a.winner=null;a.log=['El duelo terminó por inactividad.']; }
@@ -10,13 +11,13 @@ function challenge(a,from,to,now=Date.now()) {
   if (a && (['pending','active'].includes(a.status) || (!a.settled && a.status==='finished'))) fail(409,'La arena está ocupada; espera a que termine el duelo');
   if (from.id===to.id) fail(400,'Elige a otro explorador');
   return { id:randomUUID(),status:'pending',turn:0,next:from.id,expiresAt:now+45000,
-    fighters:[from,to].map(p=>({id:p.id,name:p.name,hp:40,maxHp:40,guard:false,potions:2,focus:2,chilled:false})),
+    fighters:[from,to].map(p=>{const loadout=duelLoadout(p);return {id:p.id,name:p.name,...loadout,hp:loadout.maxHp,guard:false,potions:2,focus:2,chilled:false};}),
     log:[`${from.name} invita a ${to.name}. Ambos deben aceptar combatir.`] };
 }
 function respond(a,id,duelId,accept,now=Date.now()) {
   participant(a,id);expired(a,now);
   if (a.id!==duelId || a.status!=='pending' || a.fighters[1].id!==id) fail(409,'La invitación ya no está disponible');
-  a.status=accept?'active':'declined';a.expiresAt=now+60000;a.log=[accept?'¡Duelo iniciado! Salud y daño iguales para ambos.':'Invitación rechazada.'];return a;
+  a.status=accept?'active':'declined';a.expiresAt=now+60000;a.log=[accept?'¡Duelo iniciado! Equipo fijado al enviar la invitación.':'Invitación rechazada.'];return a;
 }
 function turn(a,id,duelId,version,action,now=Date.now()) {
   participant(a,id);expired(a,now);
@@ -30,9 +31,9 @@ function turn(a,id,duelId,version,action,now=Date.now()) {
   me.guard=false;a.events=[];
   if(action==='run'){a.status='finished';a.winner=other.id;a.log=[`${me.name} se retira.`];}
   else if(['attack','power','frost'].includes(action)){
-    let damage={attack:10,power:16,frost:6}[action];
+    let damage={attack:10,power:16,frost:6}[action]+((me.attack??10)-10);
     if(me.chilled){damage=Math.max(1,damage-4);me.chilled=false;}
-    if(other.guard)damage=Math.ceil(damage*.25);
+    if(other.guard)damage=Math.ceil(damage*.3);
     other.hp=Math.max(0,other.hp-damage);other.guard=false;
     if(action==='frost')other.chilled=true;
     a.events.push({actor:me.id,target:other.id,action,damage});

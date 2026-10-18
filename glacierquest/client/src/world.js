@@ -1,3 +1,4 @@
+import { activeBubbles, drawBubble } from './chat-bubbles.mjs';
 export const W=1600,H=1000;
 export const camera={x:0,y:0};
 let scenery;
@@ -16,10 +17,19 @@ function base(){scenery=document.createElement('canvas');scenery.width=W;scenery
  for(const [x,y,h] of [[1190,180,45],[1290,170,60],[1340,230,35]]){c.fillStyle='#91acb6';c.fillRect(x,y-h,18,h);c.fillStyle='#e9f4f3';c.fillRect(x-4,y-h-4,26,7);ellipse(c,x+10,y+4,22,7,'#5f839028');}poly(c,[[1190,155],[1260,110],[1310,151]],'#aac2c9');
  for(let i=0;i<12;i++){const x=100+i*132;poly(c,[[x-80,80],[x,-30-(i%3)*30],[x+100,80]],i%2?'#9fbbc8':'#aec8d1');poly(c,[[x-31,18],[x,-30-(i%3)*30],[x+39,15],[x+10,7],[x-4,20]],'#e9f4f0');}
  cabin(c,250,275);cabin(c,390,270,.72);cabin(c,175,415,.6);
+ c.fillStyle='#ae6b59';c.fillRect(355,259,70,10);c.fillStyle='#ffe3b0';c.fillRect(360,282,60,19);c.fillStyle='#493b36';c.font='bold 10px Segoe UI';c.textAlign='center';c.fillText('TIENDA',390,295);
  c.font='bold 13px Segoe UI';c.textAlign='center';c.fillStyle='#5d7e8d';for(const [t,x,y] of [['REFUGIO BOREAL',320,445],['LAGO DE LOS ECOS',760,610],['BOSQUE DE ESCARCHA',1190,865],['RUINAS DEL NORTE',1260,305],['CÍRCULO DE LOS VALIENTES',360,895]])c.fillText(t,x,y);
  for(let i=0;i<22;i++){const x=(i*331+830)%W,y=(i*193+95)%H;poly(c,[[x,y],[x-6,y-21],[x+1,y-35],[x+10,y-14],[x+6,y+2]],i%2?'#78b9cb':'#a0c8d8');}
 }
-function penguin(c,x,y,color,label,level,now,walking=false){c.save();c.translate(x,y+(walking?Math.sin(now/80)*2:0));ellipse(c,2,15,18,6,'#294b6540');ellipse(c,-6,17,7,3,'#dfa657');ellipse(c,7,17,7,3,'#dfa657');ellipse(c,0,-1,14,20,color);ellipse(c,-13,2,4,10,color);ellipse(c,13,2,4,10,color);ellipse(c,0,4,9,12,'#f4faf5');ellipse(c,-4,-10,3,4,'#f4faf5');ellipse(c,4,-10,3,4,'#f4faf5');ellipse(c,-3,-10,1.4,2,'#173447');ellipse(c,5,-10,1.4,2,'#173447');poly(c,[[-4,-5],[6,-5],[0,1]],'#eeb96a');c.fillStyle='#d68c69';c.fillRect(-11,-1,23,4);c.fillRect(7,1,5,10);c.font='600 10px Segoe UI';c.textAlign='center';const text=level?`${label} · Nv.${level}`:label,w=c.measureText(text).width+16;c.fillStyle='#142c41cc';c.beginPath();c.roundRect(-w/2,28,w,20,5);c.fill();c.fillStyle='#f4f8fa';c.fillText(text,0,42);c.restore();}
+function penguin(c,x,y,color,label,level,now,walking=false,accessory=null){c.save();c.translate(x,y+(walking?Math.sin(now/80)*2:0));ellipse(c,2,15,18,6,'#294b6540');ellipse(c,-6,17,7,3,'#dfa657');ellipse(c,7,17,7,3,'#dfa657');ellipse(c,0,-1,14,20,color);ellipse(c,-13,2,4,10,color);ellipse(c,13,2,4,10,color);ellipse(c,0,4,9,12,'#f4faf5');ellipse(c,-4,-10,3,4,'#f4faf5');ellipse(c,4,-10,3,4,'#f4faf5');ellipse(c,-3,-10,1.4,2,'#173447');ellipse(c,5,-10,1.4,2,'#173447');poly(c,[[-4,-5],[6,-5],[0,1]],'#eeb96a');if(accessory==='scarf'){c.fillStyle='#d68c69';c.fillRect(-11,-1,23,4);c.fillRect(7,1,5,10);}if(accessory==='hat'){c.fillStyle='#af475d';c.fillRect(-15,-22,30,5);c.fillRect(-10,-34,20,12);}if(accessory==='glasses'){c.fillStyle='#172b45';c.fillRect(-10,-14,9,7);c.fillRect(2,-14,9,7);c.fillRect(-2,-12,5,2);}c.font='600 10px Segoe UI';c.textAlign='center';const text=label||'',w=c.measureText(text).width+16;if(!label){c.restore();return;}c.fillStyle='#142c41cc';c.beginPath();c.roundRect(-w/2,28,w,20,5);c.fill();c.fillStyle='#f4f8fa';c.fillText(text,0,42);c.restore();}
+// Same drawing as the world: previews cannot drift from the equipped appearance.
+export function drawAvatar(canvas,avatar={}){
+ const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+ c.clearRect(0,0,w,h);c.fillStyle='#234557';c.fillRect(0,0,w,h);
+ ellipse(c,w/2,h*.8,w*.32,h*.08,'#a6d8d333');
+ const scale=Math.min(w/70,h/85);c.save();c.translate(w/2,h*.62);c.scale(scale,scale);
+ penguin(c,0,0,avatar?.color||'#36b5d8',null,null,0,false,avatar?.accessory);c.restore();
+}
 export function render(canvas,minimap,state,dt,now){if(!scenery)base();const scale=Math.min(1.15,1280/canvas.clientWidth,850/canvas.clientHeight);const cw=Math.round(canvas.clientWidth*scale),ch=Math.round(canvas.clientHeight*scale);if(cw>0&&ch>0&&(canvas.width!==cw||canvas.height!==ch)){canvas.width=cw;canvas.height=ch;}const vw=canvas.width,vh=canvas.height,c=canvas.getContext('2d'),{player,remotes,items,target,npc}=state;
  const px=player?.x??320,py=player?.y??340;camera.x=Math.max(0,Math.min(W-vw,px-vw/2));camera.y=Math.max(0,Math.min(H-vh,py-vh/2));
  c.clearRect(0,0,vw,vh);c.save();c.translate(-camera.x,-camera.y);c.drawImage(scenery,0,0);
@@ -29,9 +39,10 @@ export function render(canvas,minimap,state,dt,now){if(!scenery)base();const sca
  if(target){c.strokeStyle='#4a8d9c';c.lineWidth=2;c.beginPath();c.ellipse(target.x,target.y,10,5,0,0,Math.PI*2);c.stroke();}
  const objects=trees.map(t=>({y:t.y,draw:()=>tree(c,t)}));
  objects.push({y:npc.y,draw:()=>penguin(c,npc.x,npc.y,'#6b648d','Guardián',null,now)});
- for(const r of remotes){r.drawX+=(r.x-r.drawX)*Math.min(1,dt*10);r.drawY+=(r.y-r.drawY)*Math.min(1,dt*10);objects.push({y:r.drawY,draw:()=>penguin(c,r.drawX,r.drawY,'#996a63',r.name,r.level||1,now,Math.hypot(r.x-r.drawX,r.y-r.drawY)>2)});}
- if(player)objects.push({y:py,draw:()=>penguin(c,px,py,'#356b84',player.name,player.level||1,now,!!target||state.moving)});
+ for(const r of remotes){r.drawX+=(r.x-r.drawX)*Math.min(1,dt*10);r.drawY+=(r.y-r.drawY)*Math.min(1,dt*10);objects.push({y:r.drawY,draw:()=>penguin(c,r.drawX,r.drawY,r.avatar?.color||'#36b5d8',r.name,null,now,Math.hypot(r.x-r.drawX,r.y-r.drawY)>2,r.avatar?.accessory)});}
+ if(player)objects.push({y:py,draw:()=>penguin(c,px,py,player.avatar?.color||'#36b5d8',player.name,null,now,!!target||state.moving,player.avatar?.accessory)});
  objects.sort((a,b)=>a.y-b.y).forEach(o=>o.draw());c.restore();
  for(let i=0;i<45;i++){const x=(i*191+now*.014)%(vw+20),y=(i*73+now*(.008+i%3*.003))%(vh+20);c.fillStyle='#ffffff90';c.beginPath();c.arc(x,y,1+i%2*.5,0,Math.PI*2);c.fill();}
+ const bubbles=activeBubbles(state.messages||[],state.serverNow);for(const p of [...remotes,...(player?[player]:[])]){const x=(p.drawX??p.x)-camera.x,y=(p.drawY??p.y)-camera.y;if(bubbles.has(p.id)&&x>=0&&x<=vw&&y>=0&&y<=vh)drawBubble(c,bubbles.get(p.id).body,x,y,vw,vh);}
  const m=minimap.getContext('2d');m.drawImage(scenery,0,0,160,100);m.strokeStyle='#ffffff';m.lineWidth=1;m.strokeRect(camera.x/10,camera.y/10,vw/10,vh/10);m.fillStyle='#0c536e';m.beginPath();m.arc(px/10,py/10,3,0,Math.PI*2);m.fill();m.fillStyle='#be6e60';for(const r of remotes){m.beginPath();m.arc(r.x/10,r.y/10,2,0,Math.PI*2);m.fill();}
 }

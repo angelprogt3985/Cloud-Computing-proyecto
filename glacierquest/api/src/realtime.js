@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { GoogleAuth } = require('google-auth-library');
 const { fail } = require('./game');
+const { CHAT_TTL_MS, recentMessages, recentRoom } = require('./chat-policy');
 
 function normalizePlayer(value) {
   return value ? require('./expedition').normalize({ ...value, collected: value.collected || [], battle: value.battle || null }) : undefined;
@@ -69,23 +70,23 @@ class RealtimeStore {
     fail(409, 'Otra acción está actualizando tu partida; vuelve a intentar');
   }
   async heartbeat(player, position) {
-    await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, level:player.level || 1, x: position.x, y: position.y, seenAt: this.now() } });
+    await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, level:player.level || 1, avatar: player.avatar || null, x: position.x, y: position.y, seenAt: this.now() } });
   }
   async room() {
-    if (this.roomCache && this.now() - this.roomCache.at < 500) return structuredClone(this.roomCache.value);
+    if (this.roomCache && this.now() - this.roomCache.at < 500) return recentRoom(this.roomCache.value, this.now());
     if (!this.roomPending) {
       this.roomPending = Promise.all([
         this.request('gq_presence', { query: { orderBy: 'seenAt', startAt: this.now() - 30000, limitToLast: 40 } }),
-        this.request('gq_chat', { query: { orderBy: 'createdAt', limitToLast: 30 } })
+        this.request('gq_chat', { query: { orderBy: 'createdAt', startAt: this.now() - CHAT_TTL_MS, limitToLast: 30 } })
       ]).then(([people, chat]) => {
-        const value = { players: Object.values(people.value || {}), messages: Object.values(chat.value || {}).sort((a, b) => a.createdAt - b.createdAt) };
+        const value = { players: Object.values(people.value || {}), messages: recentMessages(Object.values(chat.value || {}), this.now()) };
         this.roomCache = { at: this.now(), value }; return value;
       }).finally(() => { this.roomPending = null; });
     }
-    return structuredClone(await this.roomPending);
+    return recentRoom(await this.roomPending, this.now());
   }
   async chat(player, body) {
-    const message = { id: randomUUID(), player_name: player.name, body, createdAt: this.now() };
+    const message = { id: randomUUID(), player_id: player.id, player_name: player.name, body, createdAt: this.now() };
     await this.request(`gq_chat/${message.id}`, { method: 'PUT', body: message });
     this.roomCache = null; return message;
   }
@@ -93,7 +94,7 @@ class RealtimeStore {
   async cleanup() {
     // Only transient records: never delete players, inventory or progress.
     const deadline = this.now() + 15000;
-    const cutoffs = { gq_presence: { field: 'seenAt', cutoff: this.now() - 60000 }, gq_chat: { field: 'createdAt', cutoff: this.now() - 7 * 86400000 } };
+    const cutoffs = { gq_presence: { field: 'seenAt', cutoff: this.now() - 60000 }, gq_chat: { field: 'createdAt', cutoff: this.now() - CHAT_TTL_MS } };
     const removed = { gq_presence: 0, gq_chat: 0 };
     for (const [collection, { field, cutoff }] of Object.entries(cutoffs)) {
       if (this.now() >= deadline) break;

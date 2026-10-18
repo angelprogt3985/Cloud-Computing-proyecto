@@ -4,6 +4,8 @@ const { createHmac, timingSafeEqual, randomUUID } = require('node:crypto');
 const { NPC, ITEMS, fail, coordinates, newPlayer, startBattle, battleTurn, collect } = require('./game');
 const expedition = require('./expedition');
 const arena = require('./arena');
+const wardrobe = require('./wardrobe');
+const { serviceEvidence } = require('./service-evidence');
 function createApp({ store, secret, demoCode, logger = console.log, maintenanceAuth = require('./maintenance').authorizeMaintenance, accountAuth = require('./accounts').accountAuth }) {
   const app = express();
   app.disable('x-powered-by');
@@ -17,7 +19,7 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     next();
   });
   const sign = payload => createHmac('sha256', secret).update(payload).digest('base64url');
-  const token = id => { const payload = Buffer.from(JSON.stringify({ id, exp: Date.now() + 7 * 86400000 })).toString('base64url'); return `${payload}.${sign(payload)}`; };
+  const token = id => { const payload = Buffer.from(JSON.stringify({ id, chatSince: Date.now(), exp: Date.now() + 7 * 86400000 })).toString('base64url'); return `${payload}.${sign(payload)}`; };
   function auth(req, res, next) {
     try {
       const [payload, sig, extra] = (req.headers.authorization || '').replace(/^Bearer /, '').split('.');
@@ -26,7 +28,7 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
       if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) fail(401, 'Sesión inválida');
       const data = JSON.parse(Buffer.from(payload, 'base64url'));
       if (!data.id || !Number.isFinite(data.exp) || data.exp < Date.now()) fail(401, 'Sesión expirada');
-      req.playerId = data.id; next();
+      req.playerId = data.id; req.chatSince = Number.isFinite(data.chatSince) ? data.chatSince : Date.now() - 120000; next();
     } catch { next(Object.assign(new Error('Sesión inválida o expirada'), { status: 401 })); }
   }
   // Per-instance only. Not a billing cap or distributed abuse protection.
@@ -101,17 +103,27 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
   }
   const publicPlayer=p=>{expedition.normalize(p);if(p){delete p.duelRewards;delete p.linkedAccount;}return p;};
   app.get('/api/me', async (req, res) => { const player = await store.get(req.playerId); if (!player) fail(401, 'Sesión no disponible'); res.json({ player:publicPlayer(player),quests:expedition.quests(player) }); });
+  app.get('/api/catalog', (req,res) => res.json(wardrobe.catalog));
+  app.get('/api/profile/:id', async (req,res) => {
+    const own=req.params.id===req.playerId;
+    if(!own && !(await store.room()).players.some(p=>p.id===req.params.id)) fail(404,'Explorador no disponible');
+    const p=expedition.normalize(await store.get(req.params.id));
+    if(!p) fail(404,'Explorador no disponible');
+    res.json({profile:{id:p.id,name:p.name,level:p.level,avatar:wardrobe.appearance(p),...(own?{hp:p.hp,maxHp:p.maxHp,xp:p.xp,coins:p.coins,fish:p.fish,ownedCosmetics:p.ownedCosmetics||[]}: {})}});
+  });
+  app.post('/api/avatar',async(req,res)=>res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.customize(p,req.body)))}));
+  app.post('/api/shop/buy',async(req,res)=>{const pos=coordinates(req.body.x,req.body.y);res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.purchaseAt(p,req.body.itemId,pos)))});});
   app.post('/api/sync', async (req, res) => {
     const pos = coordinates(req.body.x, req.body.y);
     const duel=await settleArena();
     const p = publicPlayer(await store.get(req.playerId)); if (!p) fail(401, 'Sesión no disponible');
-    await store.heartbeat(p, pos); res.json({ ...(await store.room()), player:p,quests:expedition.quests(p), npc: NPC, items: ITEMS,world:expedition.WORLD,places:expedition.PLACES,arena:duel,serverTime:Date.now() });
+    await store.heartbeat(p, pos); const room = await store.room(); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince); res.json({ ...room, player:p,quests:expedition.quests(p), npc: NPC, items: ITEMS,world:expedition.WORLD,places:[...expedition.PLACES,wardrobe.catalog.shop],arena:duel,serverTime:Date.now() });
   });
   app.post('/api/chat', async (req, res) => {
     const body = req.body.body;
     if (typeof body !== 'string' || !body.trim() || body.trim().length > 140) fail(400, 'Mensaje de 1 a 140 caracteres');
     const p = await store.mutate(req.playerId, p => { if (Date.now() - (p.lastChatAt || 0) < 1500) fail(429, 'Espera antes de enviar otro mensaje'); p.lastChatAt = Date.now(); return p; });
-    res.status(201).json({ message: await store.chat(p, body.trim()) });
+    res.status(201).json({ message: await store.chat(p, body.trim()), serverTime: Date.now() });
   });
   app.post('/api/collect', async (req, res) => {
     const pos = coordinates(req.body.x, req.body.y);
@@ -149,25 +161,22 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     }
     return { data: require('node:fs').readFileSync(path.join(__dirname, '../../assets/glacier-banner.svg')), source: 'archivo local', at: Date.now() };
   }
-  app.get('/api/services', async (req, res) => {
-    let database = 'error'; let asset = 'error';
-    try { await store.health(); database = store.kind === 'firestore' ? (process.env.FIRESTORE_EMULATOR_HOST ? 'emulador local; no nube' : 'Firestore conectado; fuera del conteo académico') : store.kind === 'postgres' ? (process.env.K_SERVICE ? 'PostgreSQL conectado; verificar instancia Cloud SQL en consola' : 'PostgreSQL local conectado') : process.env.K_SERVICE ? 'memoria temporal en Cloud Run; se pierde al reiniciar; no cuenta como base de datos' : 'memoria local, no nube'; } catch {}
-    try { assetCache = await loadAsset(); asset = assetCache.source; } catch {}
-    if (store.kind === 'realtime' && database !== 'error') database = 'Firebase Realtime Database conectado; fuera del conteo académico';
-    res.json({ checkedAt: new Date().toISOString(), services: [
-      { name: 'Cloud Run', status: process.env.K_SERVICE ? 'ejecutándose en Cloud Run' : 'servidor local' },
-      { name: store.kind === 'realtime' ? 'Firebase Realtime Database (no cuenta)' : store.kind === 'firestore' ? 'Firestore (no cuenta)' : store.kind === 'postgres' ? 'PostgreSQL' : 'Datos de práctica', status: database }, { name: 'Cloud Storage', status: asset },
-      { name: 'IAM', status: 'verificar roles y cuenta de servicio en consola' },
-      { name: 'Secret Manager', status: process.env.K_SERVICE ? 'verificar referencia de secretos en revisión' : process.env.GQ_SECRET_SOURCE === 'gcloud-secret-manager' ? 'secretos cargados por el iniciador desde GCP; verificar versiones y permisos en consola' : 'clave local; sin evidencia de Secret Manager' },
-      { name: 'Observability', status: 'logs JSON implementados; verificar recepción y panel en consola' },
-      { name: 'Cloud Build', status: 'verificar construcción e imagen en historial de Cloud Build' },
-      { name: 'GitHub Actions (apoyo)', status: 'verificar validación del código en GitHub' },
-      { name: 'Artifact Registry (apoyo)', status: 'verificar imagen y digest en consola' },
-      { name: 'Cloud Scheduler', status: store.cleanup && process.env.CLEANUP_SERVICE_ACCOUNT ? 'endpoint de limpieza protegido configurado; verificar ejecución del job en consola' : 'planificado: limpieza periódica; todavía no integrado' }
-    ] });
+  let assetLoading;
+  async function cachedAsset() {
+    if(assetCache && Date.now()-assetCache.at<300000) return assetCache;
+    if(!assetLoading) assetLoading=loadAsset().then(value=>(assetCache=value)).finally(()=>{assetLoading=null;});
+    return assetLoading;
+  }
+  app.get('/api/services', async (req,res)=>{
+    let databaseOk=false,asset;
+    try{await store.health();databaseOk=true;}catch{}
+    try{asset=await cachedAsset();}catch{}
+    const services=serviceEvidence({kind:store.kind,databaseOk,asset,cleanup:!!store.cleanup});
+    services.push({name:'Firebase Authentication',purpose:'Recupera tu identidad y tu progreso al iniciar sesión.',state:process.env.FIREBASE_WEB_API_KEY?'configured':'local',status:process.env.FIREBASE_WEB_API_KEY?'Acceso por correo configurado; verificar inicio real en una ventana de prueba.':'Sin acceso cloud en este entorno local.'});
+    res.json({checkedAt:new Date().toISOString(),services});
   });
   app.get('/api/asset', async (req, res) => {
-    if (!assetCache || Date.now() - assetCache.at > 300000) assetCache = await loadAsset();
+    const assetCache = await cachedAsset();
     res.set('Content-Type', 'image/svg+xml').set('Cache-Control', 'private, max-age=300').set('X-Asset-Source', assetCache.source).send(assetCache.data);
   });
   app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta desconocida' }));

@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 const { fail } = require('./game');
+const { recentMessages } = require('./chat-policy');
 class PostgresStore {
   constructor(pool) {
     this.kind = 'postgres';
@@ -33,13 +34,13 @@ class PostgresStore {
   }
   async room() {
     const [people, chat] = await Promise.all([
-      this.pool.query("SELECT id,name,x,y FROM gq_presence WHERE seen_at > now() - interval '30 seconds' ORDER BY seen_at DESC LIMIT 40"),
-      this.pool.query('SELECT data FROM gq_chat ORDER BY created_at DESC, id DESC LIMIT 30')
+      this.pool.query("SELECT presence.id,presence.name,presence.x,presence.y,players.data->'avatar' AS avatar,COALESCE(players.data->'level','1'::jsonb) AS level FROM gq_presence presence LEFT JOIN gq_players players ON players.id=presence.id WHERE presence.seen_at > now() - interval '30 seconds' ORDER BY presence.seen_at DESC LIMIT 40"),
+      this.pool.query("SELECT data FROM gq_chat WHERE created_at > now() - interval '2 minutes' ORDER BY created_at DESC, id DESC LIMIT 30")
     ]);
-    return { players: people.rows, messages: chat.rows.reverse().map(r => r.data) };
+    return { players: people.rows, messages: recentMessages(chat.rows.map(r => r.data)) };
   }
   async chat(p, body) {
-    const m = { id: require('node:crypto').randomUUID(), player_name: p.name, body, createdAt: Date.now() };
+    const m = { id: require('node:crypto').randomUUID(), player_id: p.id, player_name: p.name, body, createdAt: Date.now() };
     await this.pool.query('INSERT INTO gq_chat(id,data) VALUES ($1,$2::jsonb)', [m.id,JSON.stringify(m)]); return m;
   }
   async health() { await this.pool.query('SELECT id FROM gq_players LIMIT 1'); return true; }

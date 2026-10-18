@@ -4,3 +4,7 @@ export function mergeMessages(current, incoming) {
   for (const message of incoming) messages.set(message.id, message);
   return [...messages.values()].sort((a, b) => a.createdAt - b.createdAt).slice(-30);
 }
+
+export function recentMessages(messages, now, since=0) {
+ return messages.filter(m=>Number.isFinite(m.createdAt)&&m.createdAt>=since&&m.createdAt<=now&&now-m.createdAt<120000);
+}

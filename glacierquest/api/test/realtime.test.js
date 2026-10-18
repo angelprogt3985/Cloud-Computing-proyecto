@@ -45,10 +45,10 @@ test('Cleanup skips a reconnected player and preserves a concurrent heartbeat', 
 });
 test('Room reads are bounded, cached and isolated from callers', async () => {
   const checks = [];
-  const store = scripted([{ value: { p: { id: 'p' } } }, { value: { newer: { createdAt: 2 }, older: { createdAt: 1 } } }], checks);
+  const store = scripted([{ value: { p: { id: 'p' } } }, { value: { newer: { createdAt: 1999999999 }, older: { createdAt: 1999999998 } } }], checks);
   const room = await store.room(); room.players[0].id = 'changed';
   assert.equal((await store.room()).players[0].id, 'p');
-  assert.deepEqual(room.messages.map(m => m.createdAt), [1, 2]);
+  assert.deepEqual(room.messages.map(m => m.createdAt), [1999999998, 1999999999]);
   assert.equal(checks[0].url.searchParams.get('limitToLast'), '40');
   assert.equal(checks[1].url.searchParams.get('limitToLast'), '30');
 });
