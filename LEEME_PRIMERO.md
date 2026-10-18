@@ -1,6 +1,6 @@
 # Glacier Quest — actualización sobre la base del compañero
 
-17 de octubre de 2026. Esta entrega parte de `Cloud Computing proyecto.zip`; no sustituye sus avances por la versión anterior. Los cambios son locales y no se han subido a GitHub ni desplegado.
+17 de octubre de 2026. Esta entrega parte de `Cloud Computing proyecto.zip`; no sustituye sus avances por la versión anterior. El código se publicó en `main` y se desplegó después de la aprobación del usuario. Consulta el [registro de publicación y comprobaciones reales](glacierquest/docs/15_Despliegue_2026-10-17.md).
 
 ## Probar
 
@@ -12,7 +12,7 @@
 6. Para dos personas locales usar dos perfiles de navegador o uno normal y otro privado. Dos pestañas normales comparten la sesión guardada de esta base.
 7. Para las pruebas automatizadas abrir `glacierquest/test-local.cmd`.
 
-En memoria el progreso desaparece al detener el servidor. En el despliegue, los campos nuevos se guardarán en el perfil existente de Realtime Database y las cuentas Firebase permiten recuperarlo; esta actualización aún no fue probada contra Firebase real.
+En memoria el progreso desaparece al detener el servidor. El despliegue usa los perfiles existentes de Realtime Database y cuentas Firebase. Se comprobó su conexión real; queda la prueba funcional manual de compras y recuperación con dos cuentas descrita en el registro de publicación.
 
 - [Cambios, pruebas y pendientes](glacierquest/docs/13_Cambios_y_siguiente_paso.md).
 - [Auditoría de servicios y alcance de la comprobación](glacierquest/docs/12_Servicios_y_alcance_2026-10-17.md).
