@@ -13,6 +13,10 @@ if not exist api\node_modules\express (
 set STORE=memory
 set NODE_ENV=development
 set ASSET_BUCKET=
+set FIREBASE_WEB_API_KEY=
+set FIREBASE_DATABASE_URL=
+set CLEANUP_SERVICE_ACCOUNT=
+set CLEANUP_AUDIENCE=
 set DEMO_CODE=
 echo Abre http://localhost:8080 en el navegador.
 echo Modo local: los datos se borran al cerrar el servidor.

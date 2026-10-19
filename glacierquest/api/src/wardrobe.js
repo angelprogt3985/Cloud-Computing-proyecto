@@ -67,6 +67,7 @@ function duelLoadout(player) {
   return { avatar, maxHp: 40 + (gear?.hp || 0), attack: 10 + (gear?.attack || 0) };
 }
 function purchaseAt(player, itemId, pos) {
+  if(require('./zones').zoneOf(player)!=='plaza') fail(409,'La tienda está en la plaza');
   if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || Math.hypot(pos.x-catalog.shop.x,pos.y-catalog.shop.y)>catalog.shop.radius) fail(409,'Acércate a la Tienda Boreal');
   if (player.battle?.status === 'active') fail(409,'Termina el combate antes de comprar');
   return buy(player, itemId);

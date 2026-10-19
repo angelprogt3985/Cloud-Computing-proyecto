@@ -15,6 +15,7 @@ const intents = ['Golpe de hielo', 'Cargar ventisca', 'Ventisca'];
 function startBattle(player, now = Date.now()) {
   require('./expedition').normalize(player);
   if (player.battle?.status === 'active') return player;
+  if (require('./zones').zoneOf(player)!=='plaza') fail(409,'El guardián está en la plaza');
   if (!near(player, NPC, 52)) fail(409, 'Acércate al guardián');
   if (now - player.lastBattleAt < 10000) fail(429, 'El guardián descansa 10 segundos entre duelos');
   player.hp = player.maxHp;
@@ -56,14 +57,20 @@ function battleTurn(player, action, battleId, turn, now = Date.now()) {
   if (b.status !== 'active') player.lastBattleAt = now;
   return player;
 }
-function collect(player, itemId) {
+const RESOURCE_COOLDOWN = { coin: 120000, fish: 180000 };
+function itemZone(item) { return item.id==='c3'?'lake':item.id.startsWith('exp-')?['lake','forest','ruins'][Number(item.id.slice(4))%3]:'plaza'; }
+function availableItems(player) { return ITEMS.filter(i=>itemZone(i)===require('./zones').zoneOf(player)).map(i=>({...i,availableAt:player.resourceReadyAt?.[i.id]||0})); }
+function collect(player, itemId, now = Date.now()) {
   const item = ITEMS.find(i => i.id === itemId);
   if (!item) fail(400, 'Objeto desconocido');
-  if (player.collected.includes(itemId)) return player;
+  if (itemZone(item)!==require('./zones').zoneOf(player)) fail(409,'Ese recurso está en otra zona');
+  player.resourceReadyAt ||= {};
+  if (now < (player.resourceReadyAt[itemId] || 0)) return player;
   if (!near(player, item, 30)) fail(409, 'Acércate al objeto');
-  player.collected.push(itemId);
+  player.resourceReadyAt[itemId] = now + RESOURCE_COOLDOWN[item.type];
+  if (!player.collected.includes(itemId)) player.collected.push(itemId);
   if (item.type === 'coin') player.coins += 3; else player.fish++;
   require('./expedition').gain(player,12);
   return player;
 }
-module.exports = { NPC, ITEMS, fail, coordinates, newPlayer, startBattle, battleTurn, collect };
+module.exports = { availableItems, RESOURCE_COOLDOWN, itemZone, NPC, ITEMS, fail, coordinates, newPlayer, startBattle, battleTurn, collect };

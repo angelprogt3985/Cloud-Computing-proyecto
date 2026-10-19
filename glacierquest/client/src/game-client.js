@@ -3,7 +3,7 @@ import { mergeMessages, recentMessages } from './chat-state.mjs';
 import { render, drawAvatar, camera, W, H } from './world.js';
 const $=id=>document.getElementById(id),canvas=$('map-canvas'),minimap=$('minimap');
 let token=localStorage.getItem('gq-session')||sessionStorage.getItem('gq-session');
-let player,target,npc={x:520,y:160},items=[],places=[],remotes=[],messages=[],duel=null,mode='login',battleMode='pve';
+let player,target,npc={x:520,y:160},items=[],places=[],zones=[],remotes=[],messages=[],duel=null,mode='login',battleMode='pve';
 let playing=false,drawer=null,busy=false,started=false,mutation=0,clockOffset=0,energy=100,nearest=null,lastQuests='',lastPeople='',closedDuel='',fishing=false,local=false;
 const sound=createSoundscape();
 function audioSettings(){$('music-toggle').textContent=sound.enabled?'Sonido activado':'Sonido silenciado';$('music-toggle').setAttribute('aria-pressed',String(sound.enabled));$('music-volume').value=Math.round(sound.volume*100);$('volume-label').textContent=Math.round(sound.volume*100)+'%';$('sound-status').textContent=sound.playing?'Aurora boreal · sonando':!sound.enabled||sound.volume===0?'Sonido silenciado':'Aurora boreal · pulsa activar sonido para escuchar';}
@@ -25,8 +25,8 @@ $('toggle-minimap').onclick=()=>{const show=$('minimap').hidden;$('minimap').hid
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{notice('El juego ya ocupa toda la ventana. Puedes usar F11 en tu navegador.');}};
 document.addEventListener('fullscreenchange',()=>{$('fullscreen').textContent=document.fullscreenElement?'Salir de pantalla completa':'Pantalla completa';});
 function error(e){notice(e.message);if(e.status===401){token=null;player=null;localStorage.removeItem('gq-session');sessionStorage.removeItem('gq-session');$('join-overlay').hidden=false;}}
-async function api(path,body){const r=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(15000)});const d=await r.json();if(!r.ok){const e=new Error(d.error||'No se pudo conectar');e.status=r.status;throw e;}return d;}
-function setPlayer(p){if(!p)return;const xy=player?{x:player.x,y:player.y}:{};const old=player?.level||1;player={...p,...xy};if(player.level>old)notice(`¡Nivel ${player.level}! Más salud y fuerza para tu expedición.`);hud();}
+async function api(path,body){const r=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify({...body,...(player?{zone:player.zone||'plaza'}:{})})}),signal:AbortSignal.timeout(15000)});const d=await r.json();if(!r.ok){const e=new Error(d.error||'No se pudo conectar');e.status=r.status;throw e;}return d;}
+function setPlayer(p){if(!p)return;const changed=player&&(player.zone||'plaza')!==(p.zone||'plaza');if(changed){target=null;keys.clear();remotes=[];items=[];places=[];messages=[];npc=null;chatStart=Date.now()+clockOffset;fishing=false;$('chat-list').replaceChildren();}const xy=player&&!changed?{x:player.x,y:player.y}:{};const old=player?.level||1;player={...p,...xy};if(player.level>old)notice(`¡Nivel ${player.level}! Más salud y fuerza para tu expedición.`);hud();}
 function hud(){if(!player)return;const level=player.level||1,xp=player.xp||0,base=60*(level-1)**2,next=60*level**2;
  $('hud-name').textContent=player.name;$('level').textContent=`Nivel ${level} · ${level>4?'Guardián del norte':level>2?'Explorador de escarcha':'Viajero del hielo'}`;
  $('coins').textContent=player.coins;$('fish').textContent=player.fish;$('pocket-coins').textContent=player.coins;$('pocket-fish').textContent=player.fish;$('health').max=player.maxHp;$('health').value=player.hp;$('health-label').textContent=`${player.hp} / ${player.maxHp}`;$('xp').max=next-base;$('xp').value=xp-base;$('xp-label').textContent=`${xp-base} / ${next-base} EXP`;
@@ -62,10 +62,10 @@ $('reset-password').onclick=async()=>{try{const d=await api('account',{mode:'res
 $('link-account').onclick=()=>{authMode('register');$('join-name').value=player.name;$('join-overlay').hidden=false;};
 $('logout').onclick=()=>{localStorage.removeItem('gq-session');sessionStorage.removeItem('gq-session');location.reload();};
 fetch('/health').then(r=>r.json()).then(d=>{local=d.ephemeral;$('guest').hidden=d.cloud;$('demo-warning').hidden=!d.ephemeral;if(!d.accounts&&!d.cloud){$('join-error').textContent='Usa «Probar sin cuenta» para explorar esta versión local.';$('name-field').hidden=false;}}).catch(()=>{});
-async function sync(){try{if(playing&&player&&!document.hidden){const version=mutation;const d=await api('sync',{x:player.x,y:player.y});remotes=d.players.filter(p=>p.id!==player.id).map(p=>{const old=remotes.find(r=>r.id===p.id);return {...p,drawX:old?.drawX??p.x,drawY:old?.drawY??p.y};});npc=d.npc;items=d.items;places=d.places||[];clockOffset=d.serverTime-Date.now();if(chatStart===null)chatStart=d.serverTime;if(version===mutation&&!busy&&!profileBusy){setPlayer(d.player);showQuests(d.quests);}setArena(d.arena);showPeople();showMessages(d.messages);$('online').textContent=`${d.players.length} explorador${d.players.length===1?'':'es'}`;$('connection').textContent='Conectado';}}catch(e){$('connection').textContent='Reconectando';error(e);}finally{setTimeout(sync,1500);}}
+async function sync(){try{if(playing&&player&&!document.hidden){const version=mutation;const d=await api('sync',{x:player.x,y:player.y});if(version!==mutation||busy)return;zones=d.zones||zones;remotes=d.players.filter(p=>p.id!==player.id).map(p=>{const old=remotes.find(r=>r.id===p.id);return {...p,drawX:old?.drawX??p.x,drawY:old?.drawY??p.y};});npc=d.npc;items=d.items;places=d.places||[];clockOffset=d.serverTime-Date.now();if(chatStart===null)chatStart=d.serverTime;if(version===mutation&&!busy&&!profileBusy){setPlayer(d.player);showQuests(d.quests);}setArena(d.arena);showPeople();showMessages(d.messages);$('online').textContent=`${d.players.length} explorador${d.players.length===1?'':'es'}`;$('connection').textContent='Conectado';}}catch(e){$('connection').textContent='Reconectando';if(e.status===409){try{setPlayer((await api('me')).player);}catch{}}else error(e);}finally{setTimeout(sync,1500);}}
 $('chat-form').onsubmit=async e=>{e.preventDefault();const body=$('chat-input').value.trim();if(!body)return;const btn=e.currentTarget.querySelector('button');btn.disabled=true;try{const d=await api('chat',{body});if(Number.isFinite(d.serverTime))clockOffset=d.serverTime-Date.now();if(chatStart===null)chatStart=d.message.createdAt;showMessages([d.message]);if($('chat-input').value.trim()===body)$('chat-input').value='';}catch(e){error(e);}finally{btn.disabled=false;}};
 async function explore(action,place){if(busy||!player)return;busy=true;mutation++;try{const d=await api('explore',{action,place,x:player.x,y:player.y});setPlayer(d.player);showQuests(d.quests);clockOffset=d.serverTime-Date.now();fishing=action==='cast';notice({quest:'¡Misión completada! Recompensa guardada.',rest:'El calor del refugio te devuelve la energía.',explore:'Lugar descubierto. Sigue explorando el glaciar.',cast:'Anzuelo al agua… espera la señal y pulsa E.',catch:'¡Buena captura! +20 EXP y un pez.'}[action]);}catch(e){fishing=false;error(e);}finally{busy=false;canvas.focus();}}
-function interact(){if(!nearest||busy||!player)return;if(nearest.kind==='shop'){openShop();return;}if(nearest.kind==='arena'){openDrawer('players');explore('explore',nearest.id);}else if(nearest.kind==='fish'){const now=Date.now()+clockOffset;if(fishing&&player.fishing&&now<=player.fishing.until)explore('catch',nearest.id);else explore('cast',nearest.id);}else explore(nearest.kind==='camp'?'rest':'explore',nearest.id);}
+function interact(){if(!nearest||busy||!player)return;if(nearest.kind==='portal'){travel(nearest.id);return;}if(['forage','trade-fish','trade-crystals','clue','rune'].includes(nearest.kind)){doActivity(nearest.id);return;}if(nearest.kind==='shop'){openShop();return;}if(nearest.kind==='arena'){openDrawer('players');explore('explore',nearest.id);}else if(nearest.kind==='fish'){const now=Date.now()+clockOffset;if(fishing&&player.fishing&&now<=player.fishing.until)explore('catch',nearest.id);else explore('cast',nearest.id);}else explore(nearest.kind==='camp'?'rest':'explore',nearest.id);}
 $('interact-button').onclick=interact;
 async function challenge(id){if(busy)return;busy=true;try{setArena((await api('arena/challenge',{targetId:id})).arena);notice('Invitación enviada. Esperando respuesta…');}catch(e){error(e);}finally{busy=false;}}
 function setArena(a){if(!playing)return;if(duel&&a&&duel.id===a.id&&duel.turn>a.turn)return;duel=a;if(!player)return;const participates=a?.fighters.some(p=>p.id===player.id);$('invite-overlay').hidden=!(participates&&a.status==='pending'&&a.fighters[1].id===player.id);if(!$('invite-overlay').hidden)$('invite-text').textContent=a.fighters.map(p=>`${p.name}: ${p.maxHp} PV · ${p.attack??10} daño`).join(' / ');
@@ -109,30 +109,30 @@ function renderBattle(){if(!player||$('battle-overlay').hidden)return;const pvp=
 $('duel').onclick=async()=>{if(busy||!player)return;busy=true;mutation++;target=null;try{setPlayer((await api('battle/start',{x:player.x,y:player.y})).player);battleMode='pve';$('battle-overlay').hidden=false;}catch(e){error(e);}finally{busy=false;hud();}};
 for(const btn of document.querySelectorAll('[data-action]'))btn.onclick=async()=>{if(busy)return;busy=true;mutation++;renderBattle();try{if(battleMode==='pvp'){const d=await api('arena/turn',{id:duel.id,turn:duel.turn,action:btn.dataset.action});setArena(d.arena);setPlayer(d.player);}else{const b=player.battle;setPlayer((await api('battle/turn',{battleId:b.id,turn:b.turn,action:btn.dataset.action})).player);}}catch(e){error(e);try{setPlayer((await api('me')).player);}catch{}}finally{busy=false;renderBattle();}};
 $('close-battle').onclick=()=>{if(battleMode==='pvp'&&duel)closedDuel=duel.id;$('battle-overlay').hidden=true;canvas.focus();};
-canvas.addEventListener('pointerdown',e=>{if(!playing||drawer||!player||!$('battle-overlay').hidden||!$('profile-overlay').hidden||!$('shop-overlay').hidden)return;const r=canvas.getBoundingClientRect();const x=camera.x+(e.clientX-r.left)*canvas.width/r.width,y=camera.y+(e.clientY-r.top)*canvas.height/r.height;const hit=[player,...remotes].find(p=>Math.hypot(x-(p.drawX??p.x),y-(p.drawY??p.y))<26);if(hit){openProfile(hit.id);return;}const shop=places.find(p=>p.kind==='shop');if(shop&&x>shop.x-45&&x<shop.x+45&&y>shop.y-100&&y<shop.y+15){if(Math.hypot(player.x-shop.x,player.y-shop.y)<=shop.radius)openShop();else{target={x:shop.x,y:shop.y};notice('Camina a la tienda y pulsa E para entrar.');}return;}target={x:Math.max(16,Math.min(W-16,camera.x+(e.clientX-r.left)*canvas.width/r.width)),y:Math.max(16,Math.min(H-16,camera.y+(e.clientY-r.top)*canvas.height/r.height))};canvas.focus();});
+canvas.addEventListener('pointerdown',e=>{if(!playing||busy||!$('world-overlay').hidden||drawer||!player||!$('battle-overlay').hidden||!$('profile-overlay').hidden||!$('shop-overlay').hidden)return;const r=canvas.getBoundingClientRect();const x=camera.x+(e.clientX-r.left)*canvas.width/r.width,y=camera.y+(e.clientY-r.top)*canvas.height/r.height;const hit=[player,...remotes].find(p=>Math.hypot(x-(p.drawX??p.x),y-(p.drawY??p.y))<26);if(hit){openProfile(hit.id);return;}const shop=places.find(p=>p.kind==='shop');if(shop&&x>shop.x-45&&x<shop.x+45&&y>shop.y-100&&y<shop.y+15){if(Math.hypot(player.x-shop.x,player.y-shop.y)<=shop.radius)openShop();else{target={x:shop.x,y:shop.y};notice('Camina a la tienda y pulsa E para entrar.');}return;}target={x:Math.max(16,Math.min(W-16,camera.x+(e.clientX-r.left)*canvas.width/r.width)),y:Math.max(16,Math.min(H-16,camera.y+(e.clientY-r.top)*canvas.height/r.height))};canvas.focus();});
 const directions={w:[0,-1],a:[-1,0],s:[0,1],d:[1,0],arrowup:[0,-1],arrowdown:[0,1],arrowleft:[-1,0],arrowright:[1,0]};
-window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement?.tagName)||!playing||!player||!$('join-overlay').hidden||!$('technical-overlay').hidden||!$('profile-overlay').hidden||!$('shop-overlay').hidden||!$('battle-overlay').hidden)return;const k=e.key.toLowerCase();if(drawer)return;if(directions[k]||k==='shift'){e.preventDefault();keys.add(k);target=null;}if(k==='e'&&!e.repeat){e.preventDefault();interact();}});
+window.addEventListener('keydown',e=>{if(['INPUT','TEXTAREA','BUTTON'].includes(document.activeElement?.tagName)||!playing||busy||!$('world-overlay').hidden||!player||!$('join-overlay').hidden||!$('technical-overlay').hidden||!$('profile-overlay').hidden||!$('shop-overlay').hidden||!$('battle-overlay').hidden)return;const k=e.key.toLowerCase();if(drawer)return;if(directions[k]||k==='shift'){e.preventDefault();keys.add(k);target=null;}if(k==='e'&&!e.repeat){e.preventDefault();interact();}});
 window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear();});
 for(const btn of document.querySelectorAll('[data-move]')){const k={up:'w',down:'s',left:'a',right:'d'}[btn.dataset.move];btn.onpointerdown=e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);keys.add(k);target=null;};btn.onpointerup=btn.onpointercancel=()=>keys.delete(k);}
 let last=0;
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;let moving=false;
- if(player&&playing){const free=!drawer&&$('join-overlay').hidden&&$('battle-overlay').hidden&&$('invite-overlay').hidden&&$('technical-overlay').hidden&&$('profile-overlay').hidden&&$('shop-overlay').hidden;
+ if(player&&playing){const free=!busy&&!drawer&&$('world-overlay').hidden&&$('join-overlay').hidden&&$('battle-overlay').hidden&&$('invite-overlay').hidden&&$('technical-overlay').hidden&&$('profile-overlay').hidden&&$('shop-overlay').hidden;
   if(free){let dx=0,dy=0;for(const k of keys){const v=directions[k];if(v){dx+=v[0];dy+=v[1];}}let dist=Math.hypot(dx,dy);const keyboard=dist>0;if(!dist&&target){dx=target.x-player.x;dy=target.y-player.y;dist=Math.hypot(dx,dy);if(dist<2)target=null;}const sprint=keys.has('shift')&&energy>1&&dist>0;const step=(sprint?290:165)*dt;energy=Math.max(0,Math.min(100,energy+(sprint?-24:16)*dt));if(dist>0){moving=true;player.x=Math.max(16,Math.min(W-16,player.x+dx/dist*(keyboard?step:Math.min(step,dist))));player.y=Math.max(16,Math.min(H-16,player.y+dy/dist*(keyboard?step:Math.min(step,dist))));}
-  for(const item of items)if(!busy&&!player.collected.includes(item.id)&&!collecting.has(item.id)&&player.battle?.status!=='active'&&Math.hypot(player.x-item.x,player.y-item.y)<22){collecting.add(item.id);mutation++;api('collect',{itemId:item.id,x:player.x,y:player.y}).then(d=>{setPlayer(d.player);notice('Hallazgo guardado · +12 EXP');}).catch(error).finally(()=>setTimeout(()=>collecting.delete(item.id),2000));}
+  for(const item of items)if(!busy&&Date.now()+clockOffset>=Math.max(item.availableAt||0,player.resourceReadyAt?.[item.id]||0)&&!collecting.has(item.id)&&player.battle?.status!=='active'&&Math.hypot(player.x-item.x,player.y-item.y)<22){collecting.add(item.id);mutation++;api('collect',{itemId:item.id,x:player.x,y:player.y}).then(d=>{setPlayer(d.player);notice('Hallazgo guardado · +12 EXP');}).catch(error).finally(()=>{mutation++;setTimeout(()=>collecting.delete(item.id),2000);});}
   }
   $('stamina').value=energy;nearest=places.filter(p=>Math.hypot(p.x-player.x,p.y-player.y)<(p.radius||80)).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0];$('interaction').hidden=!nearest||!free;
   if(nearest){let hint=nearest.hint;if(nearest.kind==='fish'&&fishing&&player.fishing){const time=Date.now()+clockOffset;hint=time<player.fishing.biteAt?'Espera… el agua se mueve':time<=player.fishing.until?'¡AHORA! Pulsa E para recoger':'El pez escapó. Vuelve a lanzar.';}$('interact-hint').textContent=hint;}
-  const closest=places.slice().sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0];if(closest){$('zone-name').textContent=closest.name;$('zone-sub').textContent=(player.discovered||[]).includes(closest.id)?'Territorio descubierto':'Territorio por descubrir';}
-  $('duel').disabled=busy||Math.hypot(player.x-npc.x,player.y-npc.y)>52||duel?.status==='active';
+  const currentZone=zones.find(z=>z.id===(player.zone||'plaza'));if(currentZone){$('zone-name').textContent=currentZone.name;$('zone-sub').textContent=currentZone.detail;}
+  $('duel').disabled=busy||Math.hypot(player.x-(npc?.x??-9999),player.y-(npc?.y??-9999))>52||duel?.status==='active';
  }
  if(now-lastChatPrune>1000){showMessages([]);lastChatPrune=now;}
- render(canvas,minimap,{player,remotes,items,target,npc,moving,messages,serverNow:Date.now()+clockOffset},dt,now);requestAnimationFrame(frame);
+ render(canvas,minimap,{player,remotes,items,places,target,npc,moving,messages,serverNow:Date.now()+clockOffset},dt,now);requestAnimationFrame(frame);
 }
 if(token){$('play-game').disabled=true;$('title-player').textContent='Recuperando tu explorador…';api('me').then(d=>{player=d.player;hud();titleScreen();}).catch(()=>{localStorage.removeItem('gq-session');sessionStorage.removeItem('gq-session');token=null;titleScreen();}).finally(()=>$('play-game').disabled=false);}
 requestAnimationFrame(frame);
 
 window.addEventListener('keydown',e=>{
- if(!playing||!$('join-overlay').hidden||!$('battle-overlay').hidden||!$('invite-overlay').hidden||!$('technical-overlay').hidden||!$('profile-overlay').hidden||!$('shop-overlay').hidden)return;
+ if(!playing||!$('world-overlay').hidden||!$('join-overlay').hidden||!$('battle-overlay').hidden||!$('invite-overlay').hidden||!$('technical-overlay').hidden||!$('profile-overlay').hidden||!$('shop-overlay').hidden)return;
  if(e.key==='Escape'){e.preventDefault();if(drawer)closeDrawer();else openDrawer('menu');return;}
  if(e.key==='Tab'&&drawer){const nodes=[...$('game-drawer').querySelectorAll('button,input')].filter(n=>!n.disabled&&n.getClientRects().length);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}return;}
  if(e.repeat||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;
@@ -207,10 +207,42 @@ $('close-profile').onclick=closeProfile;
 $('profile-challenge').onclick=()=>{const id=profileId;closeProfile();challenge(id);};
 $('close-shop').onclick=closeShop;
 $('shop-wardrobe').onclick=()=>openProfile(player.id);
-$('find-shop').onclick=()=>{const shop=catalog.shop;closeProfile();target={x:shop.x,y:shop.y};notice('Sigue el camino hasta la tienda y pulsa E.');};
+$('find-shop').onclick=()=>{if((player.zone||'plaza')!=='plaza'){closeProfile();openWorld();notice('Vuelve a la plaza para visitar la tienda.');return;}const shop=catalog.shop;closeProfile();target={x:shop.x,y:shop.y};notice('Sigue el camino hasta la tienda y pulsa E.');};
 window.addEventListener('keydown',e=>{
  const overlay=!$('profile-overlay').hidden?'profile-overlay':!$('shop-overlay').hidden?'shop-overlay':null;
  if(!overlay)return;
  if(e.key==='Escape'){e.preventDefault();overlay==='profile-overlay'?closeProfile():closeShop();}
  if(e.key==='Tab'){const nodes=[...$(overlay).querySelectorAll('button')].filter(n=>!n.disabled&&n.getClientRects().length);if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===nodes.at(-1)){e.preventDefault();nodes[0].focus();}}
+});
+
+async function travel(portal){
+ if(busy||profileBusy||collecting.size){notice('Espera a que termine tu acción.');return;}
+ busy=true;mutation++;keys.clear();target=null;
+ try{const d=await api('travel',{portal,x:player.x,y:player.y});clockOffset=d.serverTime-Date.now();setPlayer(d.player);notice('Llegaste a una nueva zona. Explora sus actividades.');}
+ catch(e){error(e);}finally{mutation++;busy=false;canvas.focus();}
+}
+async function doActivity(place){
+ if(busy)return;busy=true;mutation++;target=null;
+ try{const d=await api('activity',{place,x:player.x,y:player.y});setPlayer(d.player);showQuests(d.quests);notice(d.player.activityMessage);}
+ catch(e){error(e);}finally{mutation++;busy=false;canvas.focus();}
+}
+function closeWorld(){$('world-overlay').hidden=true;canvas.focus();}
+function openWorld(){
+ if(!playing||busy||!player||!$('battle-overlay').hidden)return;
+ closeDrawer();closeProfile();closeShop();keys.clear();target=null;
+ $('world-overlay').hidden=false;$('zone-cards').replaceChildren();
+ for(const z of zones){
+  const here=z.id===(player.zone||'plaza'),card=el('article',undefined,'zone-card '+z.id);
+  const btn=el('button',here?'Estás aquí':'Caminar al sendero','secondary');btn.disabled=here;
+  card.append(el('span',{plaza:'⌂',lake:'≈',forest:'♧',ruins:'✦'}[z.id],'zone-symbol'),el('h3',z.name),el('p',z.detail),btn);
+  btn.onclick=()=>{const portal=places.find(p=>p.kind==='portal'&&p.to===z.id)||places.find(p=>p.kind==='portal'&&p.to==='plaza');closeWorld();if(portal){target={x:portal.x,y:portal.y};notice(portal.to===z.id?'Sigue el sendero y pulsa E al llegar.':'Primero vuelve a la plaza para tomar el siguiente camino.');}};
+  $('zone-cards').append(card);
+ }
+ $('close-world').focus();
+}
+$('open-world').onclick=openWorld;$('close-world').onclick=closeWorld;
+window.addEventListener('keydown',e=>{
+ if($('world-overlay').hidden)return;
+ if(e.key==='Escape'){e.preventDefault();closeWorld();}
+ if(e.key==='Tab'){const nodes=[...$('world-overlay').querySelectorAll('button')].filter(n=>!n.disabled);if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes.at(-1).focus();}else if(!e.shiftKey&&document.activeElement===nodes.at(-1)){e.preventDefault();nodes[0].focus();}}
 });

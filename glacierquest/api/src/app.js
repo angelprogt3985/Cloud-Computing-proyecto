@@ -3,6 +3,8 @@ const path = require('node:path');
 const { createHmac, timingSafeEqual, randomUUID } = require('node:crypto');
 const { NPC, ITEMS, fail, coordinates, newPlayer, startBattle, battleTurn, collect } = require('./game');
 const expedition = require('./expedition');
+const zones = require('./zones');
+const { availableItems } = require('./game');
 const arena = require('./arena');
 const wardrobe = require('./wardrobe');
 const { serviceEvidence } = require('./service-evidence');
@@ -109,31 +111,44 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     if(!own && !(await store.room()).players.some(p=>p.id===req.params.id)) fail(404,'Explorador no disponible');
     const p=expedition.normalize(await store.get(req.params.id));
     if(!p) fail(404,'Explorador no disponible');
+    if(!own&&zones.zoneOf(p)!==zones.zoneOf(await store.get(req.playerId)))fail(404,'Explorador no disponible');
     res.json({profile:{id:p.id,name:p.name,level:p.level,avatar:wardrobe.appearance(p),...(own?{hp:p.hp,maxHp:p.maxHp,xp:p.xp,coins:p.coins,fish:p.fish,ownedCosmetics:p.ownedCosmetics||[]}: {})}});
   });
   app.post('/api/avatar',async(req,res)=>res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.customize(p,req.body)))}));
-  app.post('/api/shop/buy',async(req,res)=>{const pos=coordinates(req.body.x,req.body.y);res.json({player:publicPlayer(await store.mutate(req.playerId,p=>wardrobe.purchaseAt(p,req.body.itemId,pos)))});});
+  app.post('/api/shop/buy',async(req,res)=>{const pos=coordinates(req.body.x,req.body.y);res.json({player:publicPlayer(await store.mutate(req.playerId,p=>{zones.check(p,req.body.zone);return wardrobe.purchaseAt(p,req.body.itemId,pos);}))});});
+  app.post('/api/travel',async(req,res)=>{
+    const pos=coordinates(req.body.x,req.body.y),a=await settleArena();
+    if(a&&['pending','active'].includes(a.status)&&a.fighters.some(f=>f.id===req.playerId))fail(409,'Termina o rechaza el duelo antes de viajar');
+    const player=await store.mutate(req.playerId,p=>{zones.check(p,req.body.zone);return zones.travel(p,req.body.portal,pos);});
+    await store.heartbeat(player,player);
+    res.json({player:publicPlayer(player),serverTime:Date.now()});
+  });
+  app.post('/api/activity',async(req,res)=>{
+    const pos=coordinates(req.body.x,req.body.y);
+    const player=await store.mutate(req.playerId,p=>{zones.check(p,req.body.zone);return zones.activity(Object.assign(p,pos),req.body.place);});
+    res.json({player:publicPlayer(player),quests:expedition.quests(player),serverTime:Date.now()});
+  });
   app.post('/api/sync', async (req, res) => {
     const pos = coordinates(req.body.x, req.body.y);
     const duel=await settleArena();
     const p = publicPlayer(await store.get(req.playerId)); if (!p) fail(401, 'Sesión no disponible');
-    await store.heartbeat(p, pos); const room = await store.room(); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince); res.json({ ...room, player:p,quests:expedition.quests(p), npc: NPC, items: ITEMS,world:expedition.WORLD,places:[...expedition.PLACES,wardrobe.catalog.shop],arena:duel,serverTime:Date.now() });
+    zones.check(p,req.body.zone); await store.heartbeat(p, pos); const room = await store.room(); room.players=room.players.filter(v=>zones.zoneOf(v)===p.zone); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince && zones.zoneOf(m)===p.zone); res.json({ ...room, player:p,quests:expedition.quests(p), npc:p.zone==='plaza'?NPC:null, items:availableItems(p),world:expedition.WORLD,zones:zones.ZONES,places:zones.places(p.zone),arena:duel,serverTime:Date.now() });
   });
   app.post('/api/chat', async (req, res) => {
     const body = req.body.body;
     if (typeof body !== 'string' || !body.trim() || body.trim().length > 140) fail(400, 'Mensaje de 1 a 140 caracteres');
-    const p = await store.mutate(req.playerId, p => { if (Date.now() - (p.lastChatAt || 0) < 1500) fail(429, 'Espera antes de enviar otro mensaje'); p.lastChatAt = Date.now(); return p; });
+    const p = await store.mutate(req.playerId, p => { zones.check(p,req.body.zone); if (Date.now() - (p.lastChatAt || 0) < 1500) fail(429, 'Espera antes de enviar otro mensaje'); p.lastChatAt = Date.now(); return p; });
     res.status(201).json({ message: await store.chat(p, body.trim()), serverTime: Date.now() });
   });
   app.post('/api/collect', async (req, res) => {
     const pos = coordinates(req.body.x, req.body.y);
-    const player = await store.mutate(req.playerId, p => { if (p.battle?.status === 'active') fail(409, 'Termina el duelo antes de recoger objetos'); return collect(Object.assign(p, pos), req.body.itemId); }); res.json({ player });
+    const player = await store.mutate(req.playerId, p => { zones.check(p,req.body.zone); if (p.battle?.status === 'active') fail(409, 'Termina el duelo antes de recoger objetos'); return collect(Object.assign(p, pos), req.body.itemId); }); res.json({ player });
   });
-  app.post('/api/battle/start', async (req, res) => { const pos = coordinates(req.body.x, req.body.y); res.json({ player: await store.mutate(req.playerId, p => startBattle(Object.assign(p, pos))) }); });
+  app.post('/api/battle/start', async (req, res) => { const pos = coordinates(req.body.x, req.body.y); res.json({ player: await store.mutate(req.playerId, p => {zones.check(p,req.body.zone);return startBattle(Object.assign(p, pos));}) }); });
   app.post('/api/battle/turn', async (req, res) => res.json({ player: await store.mutate(req.playerId, p => battleTurn(p, req.body.action, req.body.battleId, req.body.turn)) }));
   app.post('/api/explore',async(req,res)=>{
     const pos=coordinates(req.body.x,req.body.y);
-    const player=await store.mutate(req.playerId,p=>expedition.act(Object.assign(p,pos),req.body.action,req.body.place));
+    const player=await store.mutate(req.playerId,p=>{zones.check(p,req.body.zone);return expedition.act(Object.assign(p,pos),req.body.action,req.body.place);});
     res.json({player,quests:expedition.quests(player),serverTime:Date.now()});
   });
   app.post('/api/arena/challenge',async(req,res)=>{
@@ -144,6 +159,7 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     if(!other) fail(409,'Ese explorador ya no está conectado');
     const me=await store.get(req.playerId),target=await store.get(other.id);
     if(!me||!target) fail(409,'Jugador no disponible');
+    if(zones.zoneOf(me)!==zones.zoneOf(target))fail(409,'El explorador está en otra zona');
     if(me.battle?.status==='active'||target.battle?.status==='active') fail(409,'Terminen el combate con el guardián primero');
     const next=await store.arenaMutate(a=>arena.challenge(a,me,target));res.json({arena:next});
   });

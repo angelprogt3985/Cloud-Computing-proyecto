@@ -11,6 +11,7 @@ function normalize(p) {
   if (!p) return p;
   p.xp ??= 0; p.level = Math.floor(Math.sqrt(p.xp / 60)) + 1;
   p.maxHp = 30 + (p.level - 1) * 4; p.hp = Math.min(p.hp ?? p.maxHp, p.maxHp);
+  p.zone = require('./zones').zoneOf(p);
   p.collected ||= []; p.discovered ||= []; p.claimedQuests ||= [];
   p.guardianWins ||= 0; p.pvpWins ||= 0; p.catches ||= 0;
   return p;
@@ -37,6 +38,8 @@ function act(p, action, id, now = Date.now()) {
     p.claimedQuests.push(id); p.coins += q.coins; return gain(p,q.xp);
   }
   const place = PLACES.find(v => v.id === id);
+  const expected=id==='lake'?'lake':'plaza';
+  if(require('./zones').zoneOf(p)!==expected) fail(409,'Esta actividad está en otra zona');
   if (!place || Math.hypot(p.x-place.x,p.y-place.y)>85) fail(409,'Acércate al lugar para interactuar');
   if (!p.discovered.includes(id)) { p.discovered.push(id); gain(p,20); }
   if (action === 'rest' && place.kind === 'camp') p.hp = p.maxHp;
