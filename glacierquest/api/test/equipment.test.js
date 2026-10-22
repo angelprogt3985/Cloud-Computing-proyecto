@@ -51,3 +51,17 @@ test('all equipment matchups end with a finite winner and bounded health',()=>{
   assert.equal(a.status,'finished');assert.ok(['a','b'].includes(a.winner));
  }
 });
+
+test('energy equipment is owned, fixed at invitation and respects recovery caps',()=>{
+ const p=player('a','pendant'),q=player('b','gloves');
+ const a=arena.challenge(null,p,q,1000);wardrobe.customize(p,{accessory:null});
+ arena.respond(a,'b',a.id,true,2000);
+ arena.turn(a,'a',a.id,0,'defend',3000);arena.turn(a,'b',a.id,1,'attack',4000);
+ assert.equal(a.fighters[1].focus,3);
+ arena.turn(a,'a',a.id,2,'defend',5000);assert.equal(a.fighters[0].focus,4);
+ arena.turn(a,'b',a.id,3,'power',6000);assert.equal(a.fighters[1].focus,1);
+ arena.turn(a,'a',a.id,4,'power',7000);assert.equal(a.fighters[0].focus,2);
+ arena.turn(a,'b',a.id,5,'attack',8000);assert.equal(a.fighters[1].focus,3);
+ const unowned=player('x','pendant');unowned.ownedCosmetics=[];
+ assert.equal(wardrobe.duelLoadout(unowned).maxFocus,3);
+});

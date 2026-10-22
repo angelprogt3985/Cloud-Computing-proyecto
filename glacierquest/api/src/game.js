@@ -40,21 +40,21 @@ function battleTurn(player, action, battleId, turn, now = Date.now()) {
       b.potions--; const before = player.hp; player.hp = Math.min(player.maxHp, player.hp + 12); log.push(`Recuperas ${player.hp - before} PV.`); events.push({actor:player.id,target:player.id,action,heal:player.hp-before});
     } else if (['attack','power','frost'].includes(action)) {
       const damage = ({attack:8,power:16,frost:6}[action] + (b.turn % 3 === 1 ? 4 : 0)) + (player.level || 1) - 1;
-      b.hp = Math.max(0, b.hp - damage); log.push(`${{attack:'Golpe',power:'Impacto polar',frost:'Escarcha'}[action]}: ${damage} de daño${b.turn % 3 === 1 ? ' (guardián vulnerable)' : ''}.`); events.push({actor:player.id,target:'guardian',action,damage});
+      b.hp = Math.max(0, b.hp - damage); log.push(`${{attack:'Golpe',power:'Impacto polar',frost:'Escarcha'}[action]}: ${damage} de daño${b.turn % 3 === 1 ? ' (rival vulnerable)' : ''}.`); events.push({actor:player.id,target:b.enemyId||'guardian',action,damage});
     } else {log.push('Te cubres: reduces el daño y recuperas energía.'); events.push({actor:player.id,target:player.id,action:'defend'});}
-    if (b.hp === 0) { b.status = 'won'; player.coins += 10; player.guardianWins = (player.guardianWins || 0) + 1; require('./expedition').gain(player,45); log.push('¡Victoria! +10 monedas y +45 EXP.'); }
+    if (b.hp === 0) { b.status = 'won'; player.coins += b.rewardCoins??10; if(!b.enemyId)player.guardianWins = (player.guardianWins || 0) + 1; else player.wildWins=(player.wildWins||0)+1; require('./expedition').gain(player,b.rewardXp??45); log.push(`¡Victoria! +${b.rewardCoins??10} monedas y +${b.rewardXp??45} EXP.`); }
     else {
-      let damage = [5, 0, 14][b.turn % 3];
-      if (action === 'frost') {damage = Math.max(0, damage - 4);log.push('La escarcha reduce en 4 la respuesta del guardián.');}
+      let damage = (b.damage||[5, 0, 14])[b.turn % 3];
+      if (action === 'frost') {damage = Math.max(0, damage - 4);log.push('La escarcha reduce en 4 la respuesta del rival.');}
       if (action === 'defend') damage = Math.ceil(damage * 0.25);
       player.hp = Math.max(0, player.hp - damage);
-      events.push({actor:'guardian',target:player.id,action:damage?'attack':'charge',damage});
-      log.push(damage ? `${b.intent}: recibes ${damage} de daño.` : 'El guardián carga una ventisca. ¡Prepárate!');
+      events.push({actor:b.enemyId||'guardian',target:player.id,action:damage?'attack':'charge',damage});
+      log.push(damage ? `${b.intent}: recibes ${damage} de daño.` : 'El rival se prepara para su siguiente acción.');
       if (player.hp === 0) { b.status = 'lost'; log.push('Duelo perdido. Puedes recuperarte e intentarlo de nuevo.'); }
     }
   }
-  b.events = events; b.turn++; b.intent = intents[b.turn % 3]; b.log = log;
-  if (b.status !== 'active') player.lastBattleAt = now;
+  b.events = events; b.turn++; b.intent = (b.intents||intents)[b.turn % 3]; b.log = log;
+  if (b.status !== 'active') {player.lastBattleAt = now;require('./encounters').finish(player,b,now);}
   return player;
 }
 const RESOURCE_COOLDOWN = { coin: 120000, fish: 180000 };

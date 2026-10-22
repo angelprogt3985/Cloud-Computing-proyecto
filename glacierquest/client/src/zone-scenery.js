@@ -1,4 +1,4 @@
-const palettes={plaza:['#d7e9ec','#afcfd9'],lake:['#b7e1e8','#6faccc'],forest:['#b9d7d1','#598b86'],ruins:['#c1c5df','#757d9c']};
+const palettes={plaza:['#d7e9ec','#afcfd9'],lake:['#b7e1e8','#6faccc'],forest:['#b9d7d1','#598b86'],wilds:['#d6ddea','#718da6'],ruins:['#c1c5df','#757d9c']};
 function oval(c,x,y,w,h,color){c.fillStyle=color;c.beginPath();c.ellipse(x,y,w,h,0,0,Math.PI*2);c.fill();}
 function path(c,points){c.strokeStyle='#f0efdf99';c.lineWidth=55;c.lineCap='round';c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.stroke();c.strokeStyle='#aec5c055';c.lineWidth=2;c.stroke();}
 function hut(c,x,y,label){c.fillStyle='#487383';c.fillRect(x-45,y-55,90,65);c.fillStyle='#e5f3ee';c.beginPath();c.moveTo(x-60,y-55);c.lineTo(x,y-110);c.lineTo(x+60,y-55);c.fill();c.fillStyle='#eec68b';c.fillRect(x-30,y-40,18,18);c.fillStyle='#294b5e';c.fillRect(x+5,y-25,22,35);c.font='bold 13px Segoe UI';c.textAlign='center';c.fillStyle='#ffe6ad';c.fillText(label,x,y-60);}
@@ -8,7 +8,7 @@ export function makeZone(zone,W,H){
  for(let i=0;i<90;i++)oval(c,(i*371)%W,(i*137)%H,20+i%40,5+i%12,'#f5fffa33');
  const trees=[];
  if(zone==='plaza'){
-  path(c,[[320,340],[650,450],[1300,450]]);path(c,[[650,450],[800,800]]);path(c,[[650,450],[1050,170]]);path(c,[[320,340],[360,790]]);
+  path(c,[[650,450],[1350,820]]);path(c,[[320,340],[650,450],[1300,450]]);path(c,[[650,450],[800,800]]);path(c,[[650,450],[1050,170]]);path(c,[[320,340],[360,790]]);
   hut(c,250,275,'REFUGIO');hut(c,390,270,'TIENDA');hut(c,175,415,'EXPEDICIÓN');
   oval(c,360,790,110,70,'#6587a2');oval(c,360,790,95,58,'#d7e3e7');
   c.strokeStyle='#8a748d';c.lineWidth=5;c.strokeRect(455,105,130,100);
@@ -24,6 +24,10 @@ export function makeZone(zone,W,H){
   path(c,[[230,500],[350,300],[650,280],[1100,520],[720,800],[230,500]]);hut(c,350,300,'TALLER');
   for(let i=0;i<150;i++){const x=40+(i*239)%1520,y=50+(i*173)%900;if([[230,500],[350,300],[650,280],[1100,520],[720,800]].every(([a,b])=>Math.hypot(x-a,y-b)>110))trees.push({x,y,s:.9+(i%4)*.15});}
   oval(c,840,180,160,45,'#81cdbb55');
+ }else if(zone==='wilds'){
+  path(c,[[230,500],[650,550],[1000,300],[1210,740]]);hut(c,300,400,'ENTRADA SEGURA');
+  for(let i=0;i<30;i++){const x=450+(i*217)%1050,y=100+(i*139)%800;oval(c,x,y,35,18,'#617f98');}
+  c.fillStyle='#263e55';c.font='bold 20px Segoe UI';c.fillText('Enemigos errantes: observa sus ataques',470,150);
  }else{
   path(c,[[230,500],[700,700],[820,500],[640,330],[1000,330],[820,500]]);
   oval(c,820,450,300,240,'#9d9bb8');oval(c,820,450,260,200,'#bcbcd3');

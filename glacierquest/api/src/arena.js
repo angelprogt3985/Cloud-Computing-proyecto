@@ -27,7 +27,7 @@ function turn(a,id,duelId,version,action,now=Date.now()) {
   const focus=me.focus??2,cost={power:2,frost:1}[action]||0;
   if(focus<cost)fail(409,'Necesitas energía: usa Golpe o Defender');
   if(action==='heal'&&(!me.potions||me.hp===me.maxHp))fail(409,'No puedes curarte ahora');
-  me.focus=Math.min(3,focus-cost+(['attack','defend'].includes(action)?1:0));
+  me.focus=Math.min(me.maxFocus??3,focus-cost+(action==='attack'?(me.attackRecovery??1):action==='defend'?1:0));
   me.guard=false;a.events=[];
   if(action==='run'){a.status='finished';a.winner=other.id;a.log=[`${me.name} se retira.`];}
   else if(['attack','power','frost'].includes(action)){

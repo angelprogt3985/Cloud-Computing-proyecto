@@ -1,15 +1,17 @@
 const { fail } = require('./game');
 const ZONES = [
+  {id:'wilds',name:'Paso de Escarcha',detail:'Enemigos errantes: acércate para combatir y ganar experiencia',color:'#bac9dd'},
   { id:'plaza', name:'Plaza Boreal', detail:'Tienda, refugio y duelos de práctica', color:'#c8e3e8' },
   { id:'lake', name:'Bahía de los Ecos', detail:'Pesca con ritmo y cambia dos peces por seis monedas', color:'#86c6d8' },
   { id:'forest', name:'Bosque de Aurora', detail:'Busca cristales entre los árboles y cámbialos en el taller', color:'#89bdb3' },
   { id:'ruins', name:'Ruinas Estelares', detail:'Lee las pistas y activa las tres runas en orden', color:'#a5a1cd' }
 ];
 const PORTALS = [
+  {id:'to-wilds',zone:'plaza',to:'wilds',x:1350,y:820,name:'Paso de Escarcha · peligro'},
   { id:'to-lake',zone:'plaza',to:'lake',x:1300,y:450,name:'Camino a la bahía' },
   { id:'to-forest',zone:'plaza',to:'forest',x:800,y:800,name:'Camino al bosque' },
   { id:'to-ruins',zone:'plaza',to:'ruins',x:1050,y:170,name:'Camino a las ruinas' },
-  ...['lake','forest','ruins'].map(zone=>({id:'return-'+zone,zone,to:'plaza',x:230,y:500,name:'Volver a la plaza'}))
+  ...['lake','forest','ruins','wilds'].map(zone=>({id:'return-'+zone,zone,to:'plaza',x:230,y:500,name:'Volver a la plaza'}))
 ].map(p=>({...p,kind:'portal',hint:p.name+' · E para cruzar',radius:80}));
 const ACTIVITIES = [
   {id:'fish-market',zone:'lake',x:1020,y:650,kind:'trade-fish',name:'Puesto del pescador',hint:'Cambia 2 peces por 6 monedas'},
@@ -29,7 +31,7 @@ function travel(p,id,pos){
   const portal=PORTALS.find(v=>v.id===id&&v.zone===zoneOf(p));
   if(!portal||Math.hypot(pos.x-portal.x,pos.y-portal.y)>80)fail(409,'Acércate al sendero para viajar');
   const previous=zoneOf(p);p.zone=portal.to;p.fishing=null;
-  p.runeStep=0;
+  p.runeStep=0;p.encounterSafeUntil=Date.now()+12000;
   const entry=p.zone==='plaza'?PORTALS.find(v=>v.to===previous):PORTALS.find(v=>v.zone===p.zone);
   p.x=entry.x+(p.zone==='plaza'?-100:100);p.y=entry.y;
   p.visitedZones||=['plaza'];if(!p.visitedZones.includes(p.zone))p.visitedZones.push(p.zone);

@@ -42,7 +42,7 @@ test('HTTP rooms isolate presence and chat, reject stale-zone actions and preser
  const travel=await call('travel',{zone:'plaza',portal:'to-lake',x:1300,y:450},a.token);assert.equal(travel.status,200);
  await call('chat',{body:'Bahía',zone:'lake'},a.token);
  const plaza=(await call('sync',{x:320,y:340,zone:'plaza'},b.token)).data;assert.deepEqual(plaza.players.map(p=>p.id),[b.player.id]);assert.equal(plaza.messages.length,0);
- const lake=(await call('sync',{x:330,y:500,zone:'lake'},a.token)).data;assert.equal(lake.npc,null);assert.equal(lake.messages[0].body,'Bahía');assert.ok(lake.places.some(p=>p.id==='lake'));assert.equal(lake.zones.length,4);
+ const lake=(await call('sync',{x:330,y:500,zone:'lake'},a.token)).data;assert.equal(lake.npc,null);assert.equal(lake.messages[0].body,'Bahía');assert.ok(lake.places.some(p=>p.id==='lake'));assert.equal(lake.zones.length,5);
  assert.equal((await call('collect',{x:120,y:320,itemId:'c1',zone:'plaza'},a.token)).status,409);
  assert.equal((await call('shop/buy',{x:390,y:310,itemId:'hat',zone:'lake'},a.token)).status,409);
  assert.equal((await call('arena/challenge',{targetId:b.player.id},a.token)).status,409);

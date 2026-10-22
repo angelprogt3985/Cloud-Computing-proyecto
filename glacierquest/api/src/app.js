@@ -132,7 +132,7 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     const pos = coordinates(req.body.x, req.body.y);
     const duel=await settleArena();
     const p = publicPlayer(await store.get(req.playerId)); if (!p) fail(401, 'Sesión no disponible');
-    zones.check(p,req.body.zone); await store.heartbeat(p, pos); const room = await store.room(); room.players=room.players.filter(v=>zones.zoneOf(v)===p.zone); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince && zones.zoneOf(m)===p.zone); res.json({ ...room, player:p,quests:expedition.quests(p), npc:p.zone==='plaza'?NPC:null, items:availableItems(p),world:expedition.WORLD,zones:zones.ZONES,places:zones.places(p.zone),arena:duel,serverTime:Date.now() });
+    zones.check(p,req.body.zone); await store.heartbeat(p, pos); const room = await store.room(); room.players=room.players.filter(v=>zones.zoneOf(v)===p.zone); room.messages = room.messages.filter(m => m.createdAt >= req.chatSince && zones.zoneOf(m)===p.zone); res.json({ ...room, player:p,quests:expedition.quests(p), npc:p.zone==='plaza'?NPC:null,enemies:require('./encounters').list(p), items:availableItems(p),world:expedition.WORLD,zones:zones.ZONES,places:zones.places(p.zone),arena:duel,serverTime:Date.now() });
   });
   app.post('/api/chat', async (req, res) => {
     const body = req.body.body;
@@ -144,7 +144,7 @@ function createApp({ store, secret, demoCode, logger = console.log, maintenanceA
     const pos = coordinates(req.body.x, req.body.y);
     const player = await store.mutate(req.playerId, p => { zones.check(p,req.body.zone); if (p.battle?.status === 'active') fail(409, 'Termina el duelo antes de recoger objetos'); return collect(Object.assign(p, pos), req.body.itemId); }); res.json({ player });
   });
-  app.post('/api/battle/start', async (req, res) => { const pos = coordinates(req.body.x, req.body.y); res.json({ player: await store.mutate(req.playerId, p => {zones.check(p,req.body.zone);return startBattle(Object.assign(p, pos));}) }); });
+  app.post('/api/battle/start', async (req, res) => { const a=await settleArena(); if(a&&['pending','active'].includes(a.status)&&a.fighters.some(f=>f.id===req.playerId))fail(409,'Termina o rechaza el duelo antes de combatir'); const pos = coordinates(req.body.x, req.body.y); res.json({ player: await store.mutate(req.playerId, p => {zones.check(p,req.body.zone);return req.body.enemyId?require('./encounters').start(Object.assign(p,pos),req.body.enemyId):startBattle(Object.assign(p, pos));}) }); });
   app.post('/api/battle/turn', async (req, res) => res.json({ player: await store.mutate(req.playerId, p => battleTurn(p, req.body.action, req.body.battleId, req.body.turn)) }));
   app.post('/api/explore',async(req,res)=>{
     const pos=coordinates(req.body.x,req.body.y);
