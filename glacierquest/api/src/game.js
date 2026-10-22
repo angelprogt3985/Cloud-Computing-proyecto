@@ -1,4 +1,5 @@
 const { randomUUID } = require('node:crypto');
+const { techniques } = require('./techniques');
 const NPC = { id: 'guardian', name: 'Guardián del glaciar', x: 520, y: 160 };
 const ITEMS = [{ id: 'c1', x: 120, y: 320, type: 'coin' }, { id: 'c2', x: 560, y: 340, type: 'coin' }, { id: 'c3', x: 60, y: 80, type: 'fish' }, ...[[640,700],[900,190],[1340,300],[1100,840],[1450,630],[500,900],[1020,550],[180,650]].map(([x,y],i)=>({id:`exp-${i}`,x,y,type:i%3===0?'fish':'coin'}))];
 function fail(status, message) { const e = new Error(message); e.status = status; throw e; }
@@ -26,8 +27,10 @@ function battleTurn(player, action, battleId, turn, now = Date.now()) {
   const b = player.battle;
   if (!b || b.status !== 'active') fail(409, 'No hay un duelo activo');
   if (b.id !== battleId || b.turn !== turn) fail(409, 'El turno ya cambió; sincroniza el duelo');
-  if (!['attack', 'power', 'frost', 'defend', 'heal', 'run'].includes(action)) fail(400, 'Acción inválida');
-  const focus = b.focus ?? 2, cost = {power:2,frost:1}[action] || 0;
+  if (!['attack', 'power', 'frost', 'brace', 'nova', 'defend', 'heal', 'run'].includes(action)) fail(400, 'Acción inválida');
+  const technique = techniques[action];
+  if (technique && (player.level || 1) < technique.level) fail(409, `Se desbloquea en nivel ${technique.level}`);
+  const focus = b.focus ?? 2, cost = technique?.cost ?? ({power:2,frost:1}[action] || 0);
   if (focus < cost) fail(409, 'Necesitas energía: usa Golpe o Defender');
   if (action === 'heal' && (!b.potions || player.hp === player.maxHp)) fail(409, 'No puedes curarte ahora');
   b.focus = Math.min(3, focus - cost + (['attack','defend'].includes(action) ? 1 : 0));
@@ -38,14 +41,15 @@ function battleTurn(player, action, battleId, turn, now = Date.now()) {
       if (!b.potions) fail(409, 'No quedan pociones');
       if (player.hp === player.maxHp) fail(409, 'Ya tienes toda la salud');
       b.potions--; const before = player.hp; player.hp = Math.min(player.maxHp, player.hp + 12); log.push(`Recuperas ${player.hp - before} PV.`); events.push({actor:player.id,target:player.id,action,heal:player.hp-before});
-    } else if (['attack','power','frost'].includes(action)) {
-      const damage = ({attack:8,power:16,frost:6}[action] + (b.turn % 3 === 1 ? 4 : 0)) + (player.level || 1) - 1;
-      b.hp = Math.max(0, b.hp - damage); log.push(`${{attack:'Golpe',power:'Impacto polar',frost:'Escarcha'}[action]}: ${damage} de daño${b.turn % 3 === 1 ? ' (rival vulnerable)' : ''}.`); events.push({actor:player.id,target:b.enemyId||'guardian',action,damage});
+    } else if (['attack','power','frost','brace','nova'].includes(action)) {
+      const damage = ((technique?.damage ?? {attack:8,power:16,frost:6}[action]) + (b.turn % 3 === 1 ? 4 : 0)) + (player.level || 1) - 1;
+      b.hp = Math.max(0, b.hp - damage); log.push(`${technique?.name ?? {attack:'Golpe',power:'Impacto polar',frost:'Escarcha'}[action]}: ${damage} de daño${b.turn % 3 === 1 ? ' (rival vulnerable)' : ''}.`); events.push({actor:player.id,target:b.enemyId||'guardian',action,damage});
     } else {log.push('Te cubres: reduces el daño y recuperas energía.'); events.push({actor:player.id,target:player.id,action:'defend'});}
     if (b.hp === 0) { b.status = 'won'; player.coins += b.rewardCoins??10; if(!b.enemyId)player.guardianWins = (player.guardianWins || 0) + 1; else player.wildWins=(player.wildWins||0)+1; require('./expedition').gain(player,b.rewardXp??45); log.push(`¡Victoria! +${b.rewardCoins??10} monedas y +${b.rewardXp??45} EXP.`); }
     else {
       let damage = (b.damage||[5, 0, 14])[b.turn % 3];
       if (action === 'frost') {damage = Math.max(0, damage - 4);log.push('La escarcha reduce en 4 la respuesta del rival.');}
+      if (action === 'brace') {damage = Math.ceil(damage * 0.5);log.push('Tu postura reduce a la mitad la respuesta rival.');}
       if (action === 'defend') damage = Math.ceil(damage * 0.25);
       player.hp = Math.max(0, player.hp - damage);
       events.push({actor:b.enemyId||'guardian',target:player.id,action:damage?'attack':'charge',damage});

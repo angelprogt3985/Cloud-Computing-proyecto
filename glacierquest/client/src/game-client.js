@@ -88,7 +88,7 @@ function animateBattle(b){
   const effect=el('i',event.damage?`−${event.damage}`:event.heal?`+${event.heal}`:event.action==='charge'?'Cargando':'◇','combat-float '+event.action);target.append(effect);setTimeout(()=>effect.remove(),1200);
   if(reduced)return;
   const sprite=actor.querySelector('.fighter-sprite'),victim=target.querySelector('.fighter-sprite');
-  if(['attack','power','frost'].includes(event.action)){
+  if(['attack','power','frost','brace','nova'].includes(event.action)){
    const direction=event.actor===player.id?1:-1;
    sprite.animate([{transform:'translateX(0)'},{transform:`translateX(${direction*26}px) rotate(${direction*12}deg)`},{transform:'translateX(0)'}],{duration:400});
    victim.animate([{filter:'brightness(1)'},{filter:event.action==='frost'?'brightness(2) drop-shadow(0 0 15px #9deaff)':'brightness(2)',transform:'translateY(-6px)'},{filter:'brightness(1)',transform:'translateY(0)'}],{duration:550});
@@ -104,7 +104,7 @@ function renderBattle(){if(!player||$('battle-overlay').hidden)return;const pvp=
  const active=b.status==='active',myTurn=!pvp||b.next===player.id;
  $('intent').textContent=active?(pvp?(myTurn?'Tu turno · Elige con cuidado':'Tu rival está pensando…'):`Próxima acción: ${b.intent}`):(pvp?(b.status==='expired'?'El duelo caducó por inactividad':b.winner===player.id?'¡Victoria! +60 EXP y 10 monedas':'Duelo terminado · +15 EXP por participar'):{won:`¡Victoria! +${b.rewardXp??45} EXP y ${b.rewardCoins??10} monedas`,lost:'La próxima vez será tuya',escaped:'Te retiras del combate'}[b.status]);
  $('battle-log').textContent=b.log.join(' ');const potions=pvp?me.potions:b.potions;$('heal').textContent=`✚ Curar (${potions})`;
- for(const btn of document.querySelectorAll('[data-action]'))btn.disabled=busy||!active||!myTurn||(((pvp?me.focus:b.focus)??2)<({power:2,frost:1}[btn.dataset.action]||0))||(btn.dataset.action==='heal'&&(!potions||me.hp===me.maxHp));
+ for(const btn of document.querySelectorAll('[data-action]')){const locked=(me.level||1)<Number(btn.dataset.level||1);if(btn.dataset.level){const label=btn.querySelector('small');label.dataset.description??=label.textContent;label.textContent=locked?`🔒 Nivel ${btn.dataset.level} · ${label.dataset.description}`:label.dataset.description;}btn.disabled=locked||busy||!active||!myTurn||(((pvp?me.focus:b.focus)??2)<(Number(btn.dataset.cost)||{power:2,frost:1}[btn.dataset.action]||0))||(btn.dataset.action==='heal'&&(!potions||me.hp===me.maxHp));}
  $('close-battle').hidden=active&&(pvp||!!b.enemyId);$('close-battle').textContent=active?'Ocultar combate':'Volver a explorar';}
 $('duel').onclick=async()=>{if(busy||!player)return;busy=true;mutation++;target=null;try{setPlayer((await api('battle/start',{x:player.x,y:player.y})).player);battleMode='pve';$('battle-overlay').hidden=false;}catch(e){error(e);}finally{busy=false;hud();}};
 for(const btn of document.querySelectorAll('[data-action]'))btn.onclick=async()=>{if(busy)return;busy=true;mutation++;renderBattle();try{if(battleMode==='pvp'){const d=await api('arena/turn',{id:duel.id,turn:duel.turn,action:btn.dataset.action});setArena(d.arena);setPlayer(d.player);}else{const b=player.battle;setPlayer((await api('battle/turn',{battleId:b.id,turn:b.turn,action:btn.dataset.action})).player);}}catch(e){error(e);try{setPlayer((await api('me')).player);}catch{}}finally{busy=false;renderBattle();}};
