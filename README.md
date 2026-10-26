@@ -32,6 +32,10 @@ El plan académico cuenta estos siete componentes. Firebase Realtime Database y 
 
 ## Flujo del proyecto
 
+![Arquitectura de Glacier Quest: validación, despliegue y servicios del juego](glacierquest/docs/architecture-diagram.png)
+
+[Abrir el diagrama en tamaño completo](glacierquest/docs/architecture-diagram.png). Cloud Run ejecuta la imagen guardada en Artifact Registry; su despliegue se solicita explícitamente. GitHub Actions valida el código por separado.
+
 El navegador accede por HTTPS a Cloud Run. La API valida acciones y guarda progreso, chat y presencia en Realtime Database. Firebase Authentication gestiona las cuentas con correo. El servidor consulta Storage con su cuenta de servicio y recibe secretos desde Secret Manager.
 
 Para actualizar: se valida el código con Actions, se solicita una construcción en Cloud Build, se almacena la imagen en Artifact Registry y se despliega explícitamente su digest en Cloud Run. Scheduler llama a una ruta de mantenimiento autenticada mediante OIDC.
