@@ -70,7 +70,7 @@ class RealtimeStore {
     fail(409, 'Otra acción está actualizando tu partida; vuelve a intentar');
   }
   async heartbeat(player, position) {
-    await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, level:player.level || 1, avatar: player.avatar || null, x: position.x, y: position.y, seenAt: this.now() } });
+    await this.request(`gq_presence/${player.id}`, { method: 'PUT', body: { id: player.id, name: player.name, zone: player.zone || 'plaza', level:player.level || 1, avatar: player.avatar || null, x: position.x, y: position.y, seenAt: this.now() } });
   }
   async room() {
     if (this.roomCache && this.now() - this.roomCache.at < 500) return recentRoom(this.roomCache.value, this.now());
@@ -86,7 +86,7 @@ class RealtimeStore {
     return recentRoom(await this.roomPending, this.now());
   }
   async chat(player, body) {
-    const message = { id: randomUUID(), player_id: player.id, player_name: player.name, body, createdAt: this.now() };
+    const message = { id: randomUUID(), player_id: player.id, player_name: player.name, zone: player.zone || 'plaza', body, createdAt: this.now() };
     await this.request(`gq_chat/${message.id}`, { method: 'PUT', body: message });
     this.roomCache = null; return message;
   }

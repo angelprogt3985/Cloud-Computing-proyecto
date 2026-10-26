@@ -30,8 +30,8 @@ test('four free colors preserve balances and unrelated player data', () => {
 });
 
 test('buy uses server prices, preserves combat stats, and never charges repeated purchases', () => {
-  const player = { coins: 30, hp: 17, maxHp: 30, level: 4, avatar: { future: true } };
-  assert.equal(catalog.accessories.length, 3);
+  const player = { coins: 180, hp: 17, maxHp: 30, level: 4, avatar: { future: true } };
+  assert.equal(catalog.accessories.length, 9);
   for (const accessory of catalog.accessories) {
     const previousCoins = player.coins;
     assert.equal(buy(player, accessory.id), player);
@@ -41,7 +41,7 @@ test('buy uses server prices, preserves combat stats, and never charges repeated
     assert.deepEqual(player, purchased);
     assert.equal(player.ownedCosmetics.filter(id => id === accessory.id).length, 1);
   }
-  assert.equal(player.coins, 3);
+  assert.equal(player.coins, 15);
   assert.equal(player.hp, 17);
   assert.equal(player.maxHp, 30);
   assert.equal(player.level, 4);

@@ -7,7 +7,7 @@ test('legacy profiles migrate; XP thresholds and quest claims persist without du
  p.collected=['a','b','c','d','e'];act(p,'quest','collector');const after=p.xp;act(p,'quest','collector');assert.equal(p.xp,after);
 });
 test('fishing rejects distance and early/late catches; a successful catch cannot be replayed',()=>{
- const p=newPlayer('A');assert.throws(()=>act(p,'cast','lake',20000),{status:409});p.x=760;p.y=490;
+ const p=newPlayer('A');assert.throws(()=>act(p,'cast','lake',20000),{status:409});p.zone='lake';p.x=760;p.y=490;
  act(p,'cast','lake',20000);assert.throws(()=>act(p,'catch','lake',21000),{status:409});act(p,'catch','lake',23000);
  assert.equal(p.catches,1);assert.throws(()=>act(p,'catch','lake',23001),{status:409});assert.throws(()=>act(p,'cast','lake',24000),{status:429});
  act(p,'cast','lake',40000);assert.throws(()=>act(p,'catch','lake',45000),{status:409});

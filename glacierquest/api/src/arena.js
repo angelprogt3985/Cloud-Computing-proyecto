@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const { fail } = require('./game');
+const { techniques } = require('./techniques');
 const { duelLoadout } = require('./wardrobe');
 function participant(a,id) { if (!a || !a.fighters.some(p=>p.id===id)) fail(403,'No participas en este duelo'); }
 function expired(a, now=Date.now()) {
@@ -11,7 +12,7 @@ function challenge(a,from,to,now=Date.now()) {
   if (a && (['pending','active'].includes(a.status) || (!a.settled && a.status==='finished'))) fail(409,'La arena está ocupada; espera a que termine el duelo');
   if (from.id===to.id) fail(400,'Elige a otro explorador');
   return { id:randomUUID(),status:'pending',turn:0,next:from.id,expiresAt:now+45000,
-    fighters:[from,to].map(p=>{const loadout=duelLoadout(p);return {id:p.id,name:p.name,...loadout,hp:loadout.maxHp,guard:false,potions:2};}),
+    fighters:[from,to].map(p=>{const loadout=duelLoadout(p);return {id:p.id,name:p.name,level:p.level||1,...loadout,hp:loadout.maxHp,guard:false,potions:2,focus:2,chilled:false};}),
     log:[`${from.name} invita a ${to.name}. Ambos deben aceptar combatir.`] };
 }
 function respond(a,id,duelId,accept,now=Date.now()) {
@@ -22,13 +23,31 @@ function respond(a,id,duelId,accept,now=Date.now()) {
 function turn(a,id,duelId,version,action,now=Date.now()) {
   participant(a,id);expired(a,now);
   if (a.id!==duelId || a.status!=='active' || a.turn!==version || a.next!==id) fail(409,'Espera tu turno o sincroniza el duelo');
-  if (!['attack','defend','heal','run'].includes(action)) fail(400,'Acción inválida');
+  if (!['attack','power','frost','brace','nova','defend','heal','run'].includes(action)) fail(400,'Acción inválida');
   const me=a.fighters.find(p=>p.id===id),other=a.fighters.find(p=>p.id!==id);
-  me.guard=false;
-  if (action==='run') {a.status='finished';a.winner=other.id;a.log=[`${me.name} se retira.`];}
-  else if (action==='attack') {const power=me.attack??10;const damage=other.guard?Math.ceil(power*.3):power;other.hp=Math.max(0,other.hp-damage);other.guard=false;a.log=[`${me.name} golpea: ${damage} de daño.`];}
-  else if(action==='defend') {me.guard=true;a.log=[`${me.name} prepara un escudo: reduce el próximo golpe.`];}
-  else {if(!me.potions || me.hp===me.maxHp) fail(409,'No puedes curarte ahora');me.potions--;me.hp=Math.min(me.maxHp,me.hp+12);a.log=[`${me.name} recupera salud.`];}
+  const technique=techniques[action];
+  if(technique&&(me.level||1)<technique.level)fail(409,`Se desbloquea en nivel ${technique.level}`);
+  const focus=me.focus??2,cost=technique?.cost??({power:2,frost:1}[action]||0);
+  if(focus<cost)fail(409,'Necesitas energía: usa Golpe o Defender');
+  if(action==='heal'&&(!me.potions||me.hp===me.maxHp))fail(409,'No puedes curarte ahora');
+  me.focus=Math.min(me.maxFocus??3,focus-cost+(action==='attack'?(me.attackRecovery??1):action==='defend'?1:0));
+  me.guard=false;me.braced=false;a.events=[];
+  if(action==='run'){a.status='finished';a.winner=other.id;a.log=[`${me.name} se retira.`];}
+  else if(['attack','power','frost','brace','nova'].includes(action)){
+    let damage=(technique?.damage??{attack:10,power:16,frost:6}[action])+((me.attack??10)-10);
+    if(me.chilled){damage=Math.max(1,damage-4);me.chilled=false;}
+    if(other.guard)damage=Math.ceil(damage*.3);
+    else if(other.braced)damage=Math.ceil(damage*.5);
+    other.hp=Math.max(0,other.hp-damage);other.guard=false;other.braced=false;
+    if(action==='frost')other.chilled=true;
+    if(action==='brace')me.braced=true;
+    a.events.push({actor:me.id,target:other.id,action,damage});
+    a.log=[`${me.name} usa ${technique?.name??{attack:'Golpe',power:'Impacto polar',frost:'Escarcha'}[action]}: ${damage} de daño.`];
+    if(action==='brace')a.log.push('Su postura reduce a la mitad el daño durante el próximo turno rival.');
+    if(action==='frost')a.log.push('El próximo ataque del rival causa 4 menos de daño.');
+  }
+  else if(action==='defend'){me.guard=true;a.log=[`${me.name} prepara un escudo y recupera energía.`];a.events.push({actor:me.id,target:me.id,action});}
+  else {me.potions--;const before=me.hp;me.hp=Math.min(me.maxHp,me.hp+12);a.log=[`${me.name} recupera ${me.hp-before} PV.`];a.events.push({actor:me.id,target:me.id,action,heal:me.hp-before});}
   if(other.hp===0){a.status='finished';a.winner=me.id;a.log.push(`¡${me.name} gana el duelo!`);}
   a.turn++;a.next=other.id;a.expiresAt=now+60000;return a;
 }

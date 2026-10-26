@@ -12,6 +12,12 @@ const catalog = Object.freeze({
     { id: 'hat', name: 'Gorro explorador', price: 6, hp: 0, attack: 0 },
     { id: 'scarf', name: 'Bufanda polar', price: 9, hp: 4, attack: -1 },
     { id: 'glasses', name: 'Gafas de nieve', price: 12, hp: -4, attack: 1 },
+    { id: 'earmuffs', name: 'Orejeras de aurora', price: 8, hp: 0, attack: 0 },
+    { id: 'crown', name: 'Corona de hielo', price: 18, hp: 0, attack: 0 },
+    { id: 'vest', name: 'Chaleco de expedición', price: 24, hp: 6, attack: 0 },
+    { id: 'sword', name: 'Espada de escarcha', price: 30, hp: 0, attack: 2 },
+    { id: 'pendant', name: 'Amuleto de aurora', price: 26, hp: 0, attack: 0, maxFocus: 4 },
+    { id: 'gloves', name: 'Guantes de impulso', price: 32, hp: 0, attack: 0, attackRecovery: 2 },
   ].map(Object.freeze)),
 });
 
@@ -64,9 +70,10 @@ function buy(player, itemId) {
 
 function duelLoadout(player) {
   const avatar = appearance(player), gear = item(avatar.accessory);
-  return { avatar, maxHp: 40 + (gear?.hp || 0), attack: 10 + (gear?.attack || 0) };
+  return { avatar, maxHp: 40 + (gear?.hp || 0), attack: 10 + (gear?.attack || 0), maxFocus: gear?.maxFocus || 3, attackRecovery: gear?.attackRecovery || 1 };
 }
 function purchaseAt(player, itemId, pos) {
+  if(require('./zones').zoneOf(player)!=='plaza') fail(409,'La tienda está en la plaza');
   if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || Math.hypot(pos.x-catalog.shop.x,pos.y-catalog.shop.y)>catalog.shop.radius) fail(409,'Acércate a la Tienda Boreal');
   if (player.battle?.status === 'active') fail(409,'Termina el combate antes de comprar');
   return buy(player, itemId);
