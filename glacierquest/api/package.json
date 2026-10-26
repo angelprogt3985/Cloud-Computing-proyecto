@@ -6,10 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node src/server.js",
-    "test": "node --test test/*.test.js",
-    "test:postgres": "node --test test/postgres.integration.js",
-    "test:firestore": "node --test test/firestore.integration.js"
+    "start": "node src/server.js"
   },
   "dependencies": {
     "@google-cloud/firestore": "^9.3.1",

@@ -12,7 +12,7 @@ npm ci --ignore-scripts --prefix api
 npm start --prefix api
 ```
 
-Abrir `http://localhost:8080`. En Windows también se puede ejecutar `start-local.cmd`. No abrir `client/index.html` directamente.
+Abrir `http://localhost:8080`. En Windows también se puede ejecutar `start-local.cmd`, que usa `local-env.cmd` para aislar la configuración local. No abrir `client/index.html` directamente.
 
 Sin configuración cloud, el servidor usa memoria: el progreso se pierde al detenerlo y el código de clase local queda vacío por defecto. Las cuentas persistentes con correo necesitan Firebase y su configuración; instalar dependencias no las habilita. Para otro puerto, establecer `$env:PORT='8081'` antes de iniciar.
 
@@ -45,18 +45,6 @@ El chat y los movimientos remotos se actualizan con consultas periódicas a la A
 | `client/src/soundscape.js` | Audio generado en el navegador. |
 
 `GET /health` muestra el estado del servicio. Las rutas de juego protegidas requieren sesión. `/internal/cleanup` exige identidad OIDC de mantenimiento.
-
-## Pruebas
-
-Desde `glacierquest/`:
-
-```powershell
-npm test --prefix api
-```
-
-En Windows, `test-local.cmd` ejecuta estas pruebas con el entorno local aislado mediante `local-env.cmd`. El lanzador `start-local.cmd` usa la misma limpieza de variables para evitar conexiones cloud accidentales.
-
-Cubren reglas, HTTP y componentes con dobles de prueba. No equivalen a carga ni a comprobar todos los recursos cloud. Las pruebas separadas de integración con Firestore o PostgreSQL necesitan sus entornos específicos; esas bases no están activas en la demo.
 
 ## Contenedor y alternativas
 

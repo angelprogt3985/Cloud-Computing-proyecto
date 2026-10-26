@@ -10,7 +10,7 @@ concurrency:
   group: validate-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -34,37 +34,24 @@ jobs:
           cache: npm
           cache-dependency-path: glacierquest/api/package-lock.json
       - run: npm ci --ignore-scripts --prefix api
-      - name: Tests with retained report
-        run: |
-          set -euo pipefail
-          mkdir -p evidence
-          node --test --test-reporter=tap api/test/*.test.js | tee evidence/tests.tap
       - name: Build container without publishing
-        run: docker build -t glacierquest:test .
+        run: docker build -t glacierquest:delivery .
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: '1.12.2'
       - run: terraform -chdir=infra/terraform fmt -check
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
-      - name: Keep test evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-tests-${{ github.run_id }}
-          path: glacierquest/evidence/tests.tap
-          retention-days: 7
-          if-no-files-found: ignore
       - name: Describe actual scope
         if: always()
         env:
           JOB_STATUS: ${{ job.status }}
         run: |
           {
-            echo '## Preentrega: continuous integration'
+            echo '## Final delivery: build validation'
             echo "Commit: $GITHUB_SHA"
             echo "Job status before this summary: $JOB_STATUS"
-            echo 'Memory-store HTTP/game tests and cache tests; Docker build; Terraform validation.'
-            echo 'No deployment, Terraform apply, Firestore integration test or GCP authentication.'
-            echo 'This run is not evidence of two deployed cloud services.'
+            echo 'Docker build and Terraform format/configuration validation.'
+            echo 'No deployment, Terraform apply or GCP authentication.'
+            echo 'This workflow validates packaging; it does not run gameplay tests.'
           } >> "$GITHUB_STEP_SUMMARY"

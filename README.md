@@ -13,7 +13,7 @@ El acceso requiere el código de clase compartido por los integrantes. No se pub
 El repositorio mantiene tres README:
 
 1. **Este archivo:** presentación, arquitectura y servicios.
-2. **[Aplicación](glacierquest/README.md):** instalación, pruebas y código.
+2. **[Aplicación](glacierquest/README.md):** instalación, ejecución y código.
 3. **[Infraestructura](glacierquest/infra/README.md):** recursos, seguridad, automatización y despliegue.
 
 ## Servicios integrados

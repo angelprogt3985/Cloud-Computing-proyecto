@@ -32,7 +32,7 @@ Cloud Run permite abrir la web públicamente, mientras la API protege las accion
 
 Los workflows activos están en `.github/workflows` de la raíz:
 
-- `ci.yml`: instala dependencias, ejecuta pruebas, construye un contenedor de prueba y valida formato y sintaxis de Terraform. Se activa en push a `main` o `codex/preentrega-iam-actions`, pull requests y ejecución manual. No publica imágenes ni despliega.
+- `ci.yml`: instala dependencias, construye el contenedor y valida formato y sintaxis de Terraform. Se activa en push a `main` o `codex/preentrega-iam-actions`, pull requests y ejecución manual. No publica imágenes ni despliega.
 - `verify-cloud-identity.yml`: comprueba manualmente OIDC con Workload Identity Federation. No despliega.
 
 La federación restringe repositorio, propietario, rama y workflow. La rama permitida es `codex/preentrega-iam-actions`; cambiarla exige revisar esa condición. No se usa una clave JSON persistente de cuenta de servicio en este flujo.
@@ -47,7 +47,7 @@ Autenticar primero la cuenta autorizada y comprobar modalidad, saldo y vigencia 
 
 Desde `glacierquest/`:
 
-1. Ejecutar pruebas y revisar Actions.
+1. Revisar los cambios y el resultado de construcción en Actions.
 2. Elegir una etiqueta nueva de `us-central1-docker.pkg.dev/glacier-quest-1791678996/glacierquest-demo/game` y ejecutar `infra/demo/deploy.ps1 -Stage Build -TrialVerified -Image <imagen:etiqueta>`.
 3. Esperar que Cloud Build termine correctamente. `cloudbuild.demo.yaml` ejecuta Docker y publica en Artifact Registry. Build devuelve un identificador sin esperar el resultado final.
 4. Obtener y verificar el digest SHA256.
@@ -65,7 +65,6 @@ Los valores entre `<...>` son marcadores que hay que sustituir. La configuració
 | `demo/firebase-data-role.yaml` | Rol personalizado de Database. |
 | `demo/build-lifecycle.json` | Retención de fuentes temporales. |
 | `demo/configure-monitoring.py` | Crea o actualiza el panel de `monitoring-dashboard.json`. |
-| `demo/verify*.py` | Comprobaciones; algunas escriben datos de prueba. Revisar su alcance. |
 | `bootstrap-identity.sh` | Identidades y federación GitHub/Google. |
 | `terraform/` | Infraestructura histórica validada por CI; no representa íntegramente la demo. |
 
