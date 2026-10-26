@@ -10,3 +10,9 @@
 **/application_default_credentials.json
 **/evidence/
 **/*.log
+
+# Local reports, presentations, backups and generated working files.
+/output/
+/tmp/
+**/*.pdf
+**/*.zip

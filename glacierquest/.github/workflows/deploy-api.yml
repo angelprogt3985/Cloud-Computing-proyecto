@@ -1,3 +1,0 @@
-# Workflow de CI/CD: build de la imagen del backend,
-# push a Artifact Registry y deploy a Cloud Run.
-# (pasos por definir)
