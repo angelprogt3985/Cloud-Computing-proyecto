@@ -45,3 +45,7 @@ Para actualizar: se valida el código con Actions, se solicita una construcción
 Proyecto: `glacier-quest-1791678996` · Región: `us-central1` · Servicio: `glacierquest-demo`.
 
 Es una demo académica con límites de capacidad, sin pruebas que demuestren 50 mil usuarios. El presupuesto de US$10 configura avisos; no es un corte automático del gasto. Comprobar modalidad de cuenta, saldo y vigencia de créditos en Billing antes de crear o actualizar recursos.
+
+## Video de demostración
+
+Enlace: https://drive.google.com/file/d/1U9DSK01PKNcd2kXBl6JUIRlRvGO4Aqjb/view?usp=sharing
